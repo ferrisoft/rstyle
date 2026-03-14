@@ -136,4 +136,9 @@ fixture_tests! {
 
     // Continuation indent
     continuation_indent_dot,
+
+    // Section headers
+    section_header_border_length,
+    section_header_blank_lines,
+    section_header_start_of_file,
 }

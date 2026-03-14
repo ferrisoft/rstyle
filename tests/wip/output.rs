@@ -7,9 +7,12 @@ use crate::candle::Ohlc;
 use crate::candle::Ohlcv;
 
 pub type Categories = &'static [Category];
+
+
 // =================
 // === Indicator ===
 // =================
+
 #[derive(Clone, Copy, Debug)]
 pub struct Labels {
     pub full: &'static str,
@@ -43,9 +46,12 @@ pub trait IndicatorAssoc {
 }
 
 pub type IndicatorOf<T> = <T as IndicatorAssoc>::Indicator;
-// ===================
+
+
+// ==================
 // === StepResult ===
-// ===================
+// ==================
+
 #[derive(Clone, Copy, Debug)]
 pub struct StepResult<T: Indicator> {
     pub output: Output<T>,
@@ -1186,9 +1192,9 @@ impl<T: Indicator> Stream<T> {
 }
 
 
-// =================================
+// ================================
 // === ExponentialMovingAverage ===
-// =================================
+// ================================
 
 pub mod exponential_moving_average {
     use super::*;
@@ -1327,9 +1333,9 @@ pub mod exponential_moving_average {
 use exponential_moving_average::ExponentialMovingAverage;
 
 
-// ================================================
+// ==========================================
 // === MovingAverageConvergenceDivergence ===
-// ================================================
+// ==========================================
 
 pub mod moving_average_convergence_divergence {
     use super::*;

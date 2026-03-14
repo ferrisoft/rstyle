@@ -293,6 +293,7 @@ pub fn format_source(source: &str) -> String {
     let source = reformat_chains(&source);
     let source = expand_long_inline_blocks(&source);
     let source = format_whitespace(&source);
+    let source = format_section_headers(&source);
     ensure_trailing_newline(source)
 }
 
@@ -444,7 +445,7 @@ fn reformat_chains(source: &str) -> String {
             // and collapse breaks after multi-line content if the resulting line fits.
             let indent_level = compute_chain_indent(&node);
             let indent = "    ".repeat(indent_level + 1);
-            for (i, bp) in break_points.iter().enumerate() {
+            for bp in &break_points {
                 if !bp.is_method_call {
                     continue;
                 }
@@ -620,6 +621,77 @@ fn expand_long_inline_blocks(source: &str) -> String {
         result.replace_range(start..end, &new_ws);
     }
     result
+}
+
+
+// ================================
+// === format_section_headers ===
+// ================================
+
+fn format_section_headers(source: &str) -> String {
+    let lines: Vec<&str> = source.split('\n').collect();
+    let n = lines.len();
+    let mut header_starts: Vec<usize> = Vec::new();
+    let mut i = 0;
+    while i + 2 < n {
+        let l1 = lines[i].trim();
+        let l2 = lines[i + 1].trim();
+        let l3 = lines[i + 2].trim();
+        if is_section_border(l1) && is_section_middle(l2) && is_section_border(l3) {
+            header_starts.push(i);
+            i += 3;
+        } else {
+            i += 1;
+        }
+    }
+    if header_starts.is_empty() {
+        return source.to_string();
+    }
+    let mut result: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < n {
+        if header_starts.contains(&i) {
+            let middle_trimmed = lines[i + 1].trim();
+            let indent = leading_whitespace(lines[i + 1]);
+            let border_eq_count = middle_trimmed.len() - 3;
+            let border = format!("{indent}// {}", "=".repeat(border_eq_count));
+            let middle = format!("{indent}{middle_trimmed}");
+            while !result.is_empty()
+                && result.last().map(|l| l.trim().is_empty()).unwrap_or(false)
+            {
+                result.pop();
+            }
+            if !result.is_empty() {
+                result.push(String::new());
+                result.push(String::new());
+            }
+            result.push(border.clone());
+            result.push(middle);
+            result.push(border);
+            i += 3;
+            while i < n && lines[i].trim().is_empty() {
+                i += 1;
+            }
+            result.push(String::new());
+            continue;
+        }
+        result.push(lines[i].to_string());
+        i += 1;
+    }
+    result.join("\n")
+}
+
+fn is_section_border(line: &str) -> bool {
+    line.starts_with("// ") && line.len() > 6 && line[3..].chars().all(|c| c == '=')
+}
+
+fn is_section_middle(line: &str) -> bool {
+    line.starts_with("// === ") && line.ends_with(" ===")
+}
+
+fn leading_whitespace(line: &str) -> &str {
+    let trimmed = line.trim_start();
+    &line[..line.len() - trimmed.len()]
 }
 
 
