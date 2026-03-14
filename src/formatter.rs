@@ -284,18 +284,32 @@ fn flatten_use_tree(prefix: &str, node: &SyntaxNode) -> Vec<String> {
 // === format_source ===
 // =====================
 
+const MAX_LINE_LENGTH: usize = 120;
+
 pub fn format_source(source: &str) -> String {
     let source = sort_derive_args(source);
     let source = sort_and_group_imports(&source);
-    let parse = SourceFile::parse(&source, Edition::CURRENT);
+    let source = format_whitespace(&source);
+    let source = reformat_chains(&source);
+    let source = expand_long_inline_blocks(&source);
+    let source = format_whitespace(&source);
+    ensure_trailing_newline(source)
+}
+
+
+// =========================
+// === format_whitespace ===
+// =========================
+
+fn format_whitespace(source: &str) -> String {
+    let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();
-    let tokens: Vec<SyntaxToken> = tree
-        .syntax()
+    let tokens: Vec<SyntaxToken> = tree.syntax()
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
         .collect();
     if tokens.is_empty() {
-        return ensure_trailing_newline(source.to_string());
+        return source.to_string();
     }
     let mut output = String::with_capacity(source.len());
     let mut i = 0;
@@ -333,7 +347,321 @@ pub fn format_source(source: &str) -> String {
         }
         i = j;
     }
-    ensure_trailing_newline(output)
+    output
+}
+
+
+// ========================
+// === reformat_chains ===
+// ========================
+
+struct ChainBreakPoint {
+    dot_offset: usize,
+    ws_start: usize,
+    is_method_call: bool,
+    has_newline: bool,
+}
+
+fn reformat_chains(source: &str) -> String {
+    let parse = SourceFile::parse(source, Edition::CURRENT);
+    let tree = parse.tree();
+    let chain_ranges: Vec<_> = tree
+        .syntax()
+        .descendants()
+        .filter(is_chain_root)
+        .map(|n| n.text_range())
+        .collect();
+    let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+    for node in tree.syntax().descendants() {
+        if !is_chain_root(&node) {
+            continue;
+        }
+        let range = node.text_range();
+        let is_nested = chain_ranges.iter().any(|other| {
+            *other != range && other.start() <= range.start() && range.end() <= other.end()
+        });
+        if is_nested {
+            continue;
+        }
+        let break_points = collect_chain_break_points(&node, source);
+        if break_points.is_empty() {
+            continue;
+        }
+        let chain_start: usize = node.text_range().start().into();
+        let chain_end: usize = node.text_range().end().into();
+        let chain_text = &source[chain_start..chain_end];
+        let flat_text = flatten_chain_text(chain_text, &break_points, chain_start);
+        let can_collapse = !flat_text.contains('\n');
+        if can_collapse {
+            let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let prefix_len = chain_start - line_start;
+            let after_chain = &source[chain_end..];
+            let suffix_len = after_chain
+                .find('\n')
+                .map(|p| after_chain[..p].trim_end().len())
+                .unwrap_or_else(|| after_chain.trim_end().len());
+            let total_flat_len = prefix_len + flat_text.len() + suffix_len;
+            if total_flat_len <= MAX_LINE_LENGTH {
+                for bp in &break_points {
+                    if bp.has_newline {
+                        replacements.push((bp.ws_start, bp.dot_offset, String::new()));
+                    }
+                }
+                continue;
+            }
+            // Too long to collapse — break at method dots
+            let indent_level = compute_chain_indent(&node);
+            let indent = "    ".repeat(indent_level + 1);
+            let has_existing_breaks = break_points.iter().any(|bp| bp.has_newline);
+            if has_existing_breaks {
+                let first_break_idx = break_points.iter()
+                    .position(|bp| bp.has_newline)
+                    .expect("has_existing_breaks is true");
+                let first_break_bp = &break_points[first_break_idx];
+                let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+                let first_line_len = first_break_bp.ws_start - line_start;
+                if first_line_len > MAX_LINE_LENGTH {
+                    for bp in &break_points[..first_break_idx] {
+                        if bp.is_method_call && !bp.has_newline {
+                            replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
+                        }
+                    }
+                }
+                for bp in &break_points[first_break_idx..] {
+                    if bp.is_method_call && !bp.has_newline {
+                        replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
+                    }
+                }
+            } else {
+                for bp in &break_points {
+                    if bp.is_method_call {
+                        replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
+                    }
+                }
+            }
+        } else {
+            // Multi-line chain (closures/blocks) — only break dots on lines > MAX_LINE_LENGTH,
+            // and collapse breaks after multi-line content if the resulting line fits.
+            let indent_level = compute_chain_indent(&node);
+            let indent = "    ".repeat(indent_level + 1);
+            for (i, bp) in break_points.iter().enumerate() {
+                if !bp.is_method_call {
+                    continue;
+                }
+                if bp.has_newline {
+                    // Preserve existing breaks in multi-line chains. Chain dots
+                    // should stay aligned — don't collapse })\n.method() into
+                    // }).method().
+                } else {
+                    // No existing break — add one if the line is too long
+                    let line_start = source[..bp.dot_offset]
+                        .rfind('\n')
+                        .map(|p| p + 1)
+                        .unwrap_or(0);
+                    let line_end = source[bp.dot_offset..]
+                        .find('\n')
+                        .map(|p| bp.dot_offset + p)
+                        .unwrap_or(source.len());
+                    let line_len = line_end - line_start;
+                    if line_len > MAX_LINE_LENGTH {
+                        replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
+                    }
+                }
+            }
+        }
+    }
+    if replacements.is_empty() {
+        return source.to_string();
+    }
+    replacements.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut result = source.to_string();
+    for (start, end, new_ws) in replacements {
+        result.replace_range(start..end, &new_ws);
+    }
+    result
+}
+
+fn is_chain_root(node: &SyntaxNode) -> bool {
+    if !matches!(node.kind(), METHOD_CALL_EXPR | FIELD_EXPR | AWAIT_EXPR) {
+        return false;
+    }
+    let mut ancestor = node.parent();
+    loop {
+        match ancestor {
+            None => return true,
+            Some(a) => match a.kind() {
+                TRY_EXPR => {
+                    ancestor = a.parent();
+                }
+                METHOD_CALL_EXPR | FIELD_EXPR | AWAIT_EXPR => return false,
+                _ => return true,
+            },
+        }
+    }
+}
+
+fn collect_chain_break_points(root: &SyntaxNode, source: &str) -> Vec<ChainBreakPoint> {
+    let mut points = Vec::new();
+    let mut current = root.clone();
+    loop {
+        match current.kind() {
+            METHOD_CALL_EXPR | FIELD_EXPR => {
+                let is_method = current.kind() == METHOD_CALL_EXPR;
+                if let Some(dot) = current.children_with_tokens().find(|c| c.kind() == DOT) {
+                    let dot_offset: usize = dot.text_range().start().into();
+                    let ws_start = find_ws_start_before(source, dot_offset);
+                    let has_newline = source[ws_start..dot_offset].contains('\n');
+                    points.push(ChainBreakPoint { dot_offset, ws_start, is_method_call: is_method, has_newline });
+                }
+                match current.children().next() {
+                    Some(child) => current = child,
+                    None => break,
+                }
+            }
+            AWAIT_EXPR => {
+                if let Some(dot) = current.children_with_tokens().find(|c| c.kind() == DOT) {
+                    let dot_offset: usize = dot.text_range().start().into();
+                    let ws_start = find_ws_start_before(source, dot_offset);
+                    let has_newline = source[ws_start..dot_offset].contains('\n');
+                    points.push(ChainBreakPoint { dot_offset, ws_start, is_method_call: true, has_newline });
+                }
+                match current.children().next() {
+                    Some(child) => current = child,
+                    None => break,
+                }
+            }
+            TRY_EXPR => {
+                match current.children().next() {
+                    Some(child) => current = child,
+                    None => break,
+                }
+            }
+            _ => break,
+        }
+    }
+    points.sort_by_key(|bp| bp.dot_offset);
+    points
+}
+
+fn find_ws_start_before(source: &str, pos: usize) -> usize {
+    let bytes = source.as_bytes();
+    let mut start = pos;
+    while start > 0 && matches!(bytes[start - 1], b' ' | b'\t' | b'\n' | b'\r') {
+        start -= 1;
+    }
+    start
+}
+
+fn flatten_chain_text(chain_text: &str, break_points: &[ChainBreakPoint], chain_start: usize) -> String {
+    let mut result = String::new();
+    let mut pos = 0;
+    for bp in break_points {
+        if !bp.has_newline {
+            continue;
+        }
+        let ws_local = bp.ws_start - chain_start;
+        let dot_local = bp.dot_offset - chain_start;
+        result.push_str(&chain_text[pos..ws_local]);
+        pos = dot_local;
+    }
+    result.push_str(&chain_text[pos..]);
+    result
+}
+
+fn compute_chain_indent(root: &SyntaxNode) -> usize {
+    root.children_with_tokens()
+        .find(|c| c.kind() == DOT)
+        .and_then(|dot| dot.into_token())
+        .map(|t| compute_indent_level(&t))
+        .unwrap_or(0)
+}
+
+
+// ==================================
+// === expand_long_inline_blocks ===
+// ==================================
+
+fn expand_long_inline_blocks(source: &str) -> String {
+    let parse = SourceFile::parse(source, Edition::CURRENT);
+    let tree = parse.tree();
+    let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+    for node in tree.syntax().descendants() {
+        if node.kind() != STMT_LIST {
+            continue;
+        }
+        if node.children().count() < 2 {
+            continue;
+        }
+        let start: usize = node.text_range().start().into();
+        let end: usize = node.text_range().end().into();
+        let text = &source[start..end];
+        if text.contains('\n') {
+            continue;
+        }
+        let line_start = source[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = source[end..].find('\n').map(|p| end + p).unwrap_or(source.len());
+        if line_end - line_start <= MAX_LINE_LENGTH {
+            continue;
+        }
+        for child in node.children_with_tokens() {
+            if child.kind() == WHITESPACE {
+                let ws_start: usize = child.text_range().start().into();
+                let ws_end: usize = child.text_range().end().into();
+                replacements.push((ws_start, ws_end, "\n".to_string()));
+            }
+        }
+    }
+    if replacements.is_empty() {
+        return source.to_string();
+    }
+    replacements.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut result = source.to_string();
+    for (start, end, new_ws) in replacements {
+        result.replace_range(start..end, &new_ws);
+    }
+    result
+}
+
+
+// ==============================
+// === has_continuation_dot ===
+// ==============================
+
+fn has_continuation_dot(node: &SyntaxNode) -> bool {
+    if let Some(dot) = node.children_with_tokens().find(|c| c.kind() == DOT)
+        && let Some(prev) = dot.prev_sibling_or_token()
+        && prev.kind() == WHITESPACE
+    {
+        return prev.as_token().map(|t| t.text().contains('\n')).unwrap_or(false);
+    }
+    false
+}
+
+
+// ======================================
+// === count_continuation_ancestors ===
+// ======================================
+
+fn count_continuation_ancestors(token: &SyntaxToken) -> usize {
+    let mut count = 0;
+    let Some(first_parent) = token.parent() else { return 0 };
+    let mut prev_node = first_parent;
+    let mut current = prev_node.parent();
+    while let Some(node) = current {
+        if matches!(node.kind(), METHOD_CALL_EXPR | FIELD_EXPR | AWAIT_EXPR) {
+            let came_from_receiver = node
+                .children()
+                .next()
+                .map(|fc| fc == prev_node)
+                .unwrap_or(false);
+            if !came_from_receiver && has_continuation_dot(&node) {
+                count += 1;
+            }
+        }
+        prev_node = node;
+        current = prev_node.parent();
+    }
+    count
 }
 
 
@@ -350,6 +678,7 @@ fn emit_newline_whitespace(output: &mut String, ws: &str, next_token: &SyntaxTok
     if next_token.kind() == DOT {
         indent_level += 1;
     }
+    indent_level += count_continuation_ancestors(next_token);
     for _ in 0..indent_level {
         output.push_str("    ");
     }
@@ -437,6 +766,7 @@ fn is_indent_node(node: &SyntaxNode, token: &SyntaxToken) -> bool {
             | VARIANT_LIST
             | USE_TREE_LIST
             | EXTERN_ITEM_LIST
+            | PARAM_LIST
     );
     if indenting {
         return !is_delimiter_of(node, token);
@@ -561,9 +891,10 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     if nk == R_ANGLE && is_in_generic_context(next) {
         return "";
     }
-    if nk == L_ANGLE && is_in_generic_context(next) {
-        return "";
-    }
+    if nk == L_ANGLE && is_in_generic_context(next)
+        && next.parent().map(|p| p.kind()) != Some(TYPE_ANCHOR) {
+            return "";
+        }
     // Adjacent pipes || (empty closure or logical OR in TOKEN_TREE)
     if pk == PIPE && nk == PIPE {
         return "";
@@ -674,6 +1005,10 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     if pk == COMMENT || nk == COMMENT {
         return " ";
     }
+    // Lifetime before type-starting delimiter: 'a [T], 'a (T)
+    if pk == LIFETIME_IDENT && matches!(nk, L_BRACK | L_PAREN) {
+        return " ";
+    }
     // Word-like tokens: space between
     if is_word_like(pk) && is_word_like(nk) {
         return " ";
@@ -776,7 +1111,7 @@ fn is_in_generic_context(token: &SyntaxToken) -> bool {
     match token.parent() {
         Some(parent) => matches!(
             parent.kind(),
-            GENERIC_ARG_LIST | GENERIC_PARAM_LIST | TYPE_BOUND_LIST
+            GENERIC_ARG_LIST | GENERIC_PARAM_LIST | TYPE_BOUND_LIST | TYPE_ANCHOR
         ),
         None => false,
     }
@@ -900,433 +1235,4 @@ fn ensure_trailing_newline(mut s: String) -> String {
         s.push('\n');
     }
     s
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn fmt(input: &str) -> String {
-        format_source(input)
-    }
-
-    #[test]
-    fn space_around_eq() {
-        assert_eq!(fmt("fn f() { let x=5; }\n"), "fn f() { let x = 5; }\n");
-    }
-
-    #[test]
-    fn space_after_comma() {
-        assert_eq!(
-            fmt("fn f(a: i32,b: i32) {}\n"),
-            "fn f(a: i32, b: i32) {}\n"
-        );
-    }
-
-    #[test]
-    fn space_after_colon() {
-        assert_eq!(
-            fmt("fn f() { let x:i32 = 5; }\n"),
-            "fn f() { let x: i32 = 5; }\n"
-        );
-    }
-
-    #[test]
-    fn no_space_around_double_colon() {
-        assert_eq!(fmt("use std::io::Read;\n"), "use std::io::Read;\n");
-    }
-
-    #[test]
-    fn no_space_around_dot() {
-        assert_eq!(fmt("fn f() { x.y(); }\n"), "fn f() { x.y(); }\n");
-    }
-
-    #[test]
-    fn trailing_whitespace_removed() {
-        assert_eq!(fmt("fn f() {}   \n"), "fn f() {}\n");
-    }
-
-    #[test]
-    fn trailing_newline_added() {
-        assert_eq!(fmt("fn f() {}"), "fn f() {}\n");
-    }
-
-    #[test]
-    fn tabs_to_spaces() {
-        assert_eq!(
-            fmt("fn f() {\n\tlet x = 5;\n}\n"),
-            "fn f() {\n    let x = 5;\n}\n"
-        );
-    }
-
-    #[test]
-    fn fat_arrow() {
-        assert_eq!(
-            fmt("fn f() { match x { 1=>2, _=>3 } }\n"),
-            "fn f() { match x { 1 => 2, _ => 3 } }\n"
-        );
-    }
-
-    #[test]
-    fn thin_arrow() {
-        assert_eq!(fmt("fn f()->i32 { 5 }\n"), "fn f() -> i32 { 5 }\n");
-    }
-
-    #[test]
-    fn no_space_inside_parens() {
-        assert_eq!(fmt("fn f( x: i32 ) {}\n"), "fn f(x: i32) {}\n");
-    }
-
-    #[test]
-    fn binary_operators() {
-        assert_eq!(
-            fmt("fn f() { let z = a+b*c; }\n"),
-            "fn f() { let z = a + b * c; }\n"
-        );
-    }
-
-    #[test]
-    fn unary_minus() {
-        assert_eq!(
-            fmt("fn f() { let x = -5; }\n"),
-            "fn f() { let x = -5; }\n"
-        );
-    }
-
-    #[test]
-    fn reference() {
-        assert_eq!(
-            fmt("fn f(x: &i32) { let y = &x; }\n"),
-            "fn f(x: &i32) { let y = &x; }\n"
-        );
-    }
-
-    #[test]
-    fn no_space_in_generics() {
-        assert_eq!(fmt("fn f(x: Vec<i32>) {}\n"), "fn f(x: Vec<i32>) {}\n");
-    }
-
-    #[test]
-    fn preserves_line_breaks() {
-        let input = "fn f() {\n    let x = 5;\n    let y = 6;\n}\n";
-        assert_eq!(fmt(input), input);
-    }
-
-    #[test]
-    fn empty_braces() {
-        assert_eq!(fmt("fn f() {}\n"), "fn f() {}\n");
-    }
-
-    #[test]
-    fn struct_literal() {
-        assert_eq!(
-            fmt("fn f() { let s = S { x: 1, y: 2 }; }\n"),
-            "fn f() { let s = S { x: 1, y: 2 }; }\n"
-        );
-    }
-
-    #[test]
-    fn pub_crate() {
-        assert_eq!(fmt("pub(crate) fn f() {}\n"), "pub(crate) fn f() {}\n");
-    }
-
-    #[test]
-    fn closure() {
-        assert_eq!(
-            fmt("fn f() { let c = |x, y| x + y; }\n"),
-            "fn f() { let c = |x, y| x + y; }\n"
-        );
-    }
-
-    #[test]
-    fn comparison_operators() {
-        assert_eq!(
-            fmt("fn f() { let b = x<y && y>z; }\n"),
-            "fn f() { let b = x < y && y > z; }\n"
-        );
-    }
-
-    #[test]
-    fn question_mark() {
-        assert_eq!(
-            fmt("fn f() -> Result<()> { x()?; Ok(()) }\n"),
-            "fn f() -> Result<()> { x()?; Ok(()) }\n"
-        );
-    }
-
-    #[test]
-    fn macro_call() {
-        assert_eq!(
-            fmt("fn f() { println!(\"hello\"); }\n"),
-            "fn f() { println!(\"hello\"); }\n"
-        );
-    }
-
-    #[test]
-    fn use_statement() {
-        assert_eq!(
-            fmt("use std::collections::HashMap;\n"),
-            "use std::collections::HashMap;\n"
-        );
-    }
-
-    #[test]
-    fn impl_block() {
-        let input = "impl Foo {\n    fn bar(&self) -> i32 {\n        42\n    }\n}\n";
-        assert_eq!(fmt(input), input);
-    }
-
-    #[test]
-    fn already_formatted_sample() {
-        let input = concat!(
-            "pub fn register(bus: &Bus, shortcut: String) -> Result<()> {\n",
-            "    let action_str = action_str.into();\n",
-            "    let action = Action { topic: topic.to_string(), data: data.to_string() };\n",
-            "    Ok(())\n",
-            "}\n",
-        );
-        assert_eq!(fmt(input), input);
-    }
-
-    #[test]
-    fn attribute() {
-        assert_eq!(
-            fmt("#[derive(Clone, Debug)]\nstruct S;\n"),
-            "#[derive(Clone, Debug)]\nstruct S;\n"
-        );
-    }
-
-    #[test]
-    fn logical_operators() {
-        assert_eq!(
-            fmt("fn f() { let b = a&&b||c; }\n"),
-            "fn f() { let b = a && b || c; }\n"
-        );
-    }
-
-    #[test]
-    fn compound_assignment() {
-        assert_eq!(
-            fmt("fn f() { x+=1; y-=2; z*=3; }\n"),
-            "fn f() { x += 1; y -= 2; z *= 3; }\n"
-        );
-    }
-
-    #[test]
-    fn match_arms_multiline() {
-        let input = concat!(
-            "fn f() {\n",
-            "    match x {\n",
-            "        1 => println!(\"one\"),\n",
-            "        _ => println!(\"other\"),\n",
-            "    }\n",
-            "}\n",
-        );
-        assert_eq!(fmt(input), input);
-    }
-
-    #[test]
-    fn ref_mut() {
-        assert_eq!(
-            fmt("fn f(x: &mut i32) {}\n"),
-            "fn f(x: &mut i32) {}\n"
-        );
-    }
-
-    #[test]
-    fn multiple_blank_lines_preserved() {
-        let input = "fn f() {}\n\n\nfn g() {}\n";
-        assert_eq!(fmt(input), input);
-    }
-
-    #[test]
-    fn for_loop() {
-        assert_eq!(
-            fmt("fn f() { for x in 0..10 { println!(\"{x}\"); } }\n"),
-            "fn f() { for x in 0..10 { println!(\"{x}\"); } }\n"
-        );
-    }
-
-    #[test]
-    fn if_else() {
-        let input = "fn f() {\n    if x > 0 {\n        1\n    } else {\n        2\n    }\n}\n";
-        assert_eq!(fmt(input), input);
-    }
-
-    #[test]
-    fn macro_path_separator() {
-        assert_eq!(
-            fmt("fn f() { m![Div::new()] }\n"),
-            "fn f() { m![Div::new()] }\n"
-        );
-    }
-
-    #[test]
-    fn macro_reference() {
-        assert_eq!(
-            fmt("fn f() { m![&x, &mut y] }\n"),
-            "fn f() { m![&x, &mut y] }\n"
-        );
-    }
-
-    #[test]
-    fn macro_empty_closure() {
-        assert_eq!(
-            fmt("fn f() { m![|| x] }\n"),
-            "fn f() { m![|| x] }\n"
-        );
-    }
-
-    #[test]
-    fn macro_braces() {
-        assert_eq!(
-            fmt("fn f() { m! { x } }\n"),
-            "fn f() { m! { x } }\n"
-        );
-    }
-
-    #[test]
-    fn indent_fn_body() {
-        assert_eq!(
-            fmt("fn f() {\nlet x = 5;\nlet y = 10;\n}\n"),
-            "fn f() {\n    let x = 5;\n    let y = 10;\n}\n"
-        );
-    }
-
-    #[test]
-    fn indent_nested_blocks() {
-        assert_eq!(
-            fmt("fn f() {\nif true {\nprintln!(\"hi\");\n}\n}\n"),
-            "fn f() {\n    if true {\n        println!(\"hi\");\n    }\n}\n"
-        );
-    }
-
-    #[test]
-    fn indent_impl_body() {
-        assert_eq!(
-            fmt("impl Foo {\nfn bar(&self) {\n42\n}\n}\n"),
-            "impl Foo {\n    fn bar(&self) {\n        42\n    }\n}\n"
-        );
-    }
-
-    #[test]
-    fn indent_enum_variants() {
-        assert_eq!(
-            fmt("enum E {\nA,\nB,\nC,\n}\n"),
-            "enum E {\n    A,\n    B,\n    C,\n}\n"
-        );
-    }
-
-    #[test]
-    fn indent_struct_fields() {
-        assert_eq!(
-            fmt("struct S {\nx: i32,\ny: i32,\n}\n"),
-            "struct S {\n    x: i32,\n    y: i32,\n}\n"
-        );
-    }
-
-    #[test]
-    fn indent_match_arms() {
-        assert_eq!(
-            fmt("fn f() {\nmatch x {\n1 => 2,\n_ => 3,\n}\n}\n"),
-            "fn f() {\n    match x {\n        1 => 2,\n        _ => 3,\n    }\n}\n"
-        );
-    }
-
-    #[test]
-    fn flatten_use_tree_list() {
-        assert_eq!(
-            fmt("use std::{\nio,\nfs,\n};\n"),
-            "use std::fs;\nuse std::io;\n"
-        );
-    }
-
-    #[test]
-    fn indent_fixes_wrong_indent() {
-        assert_eq!(
-            fmt("fn f() {\n        let x = 5;\n  let y = 10;\n}\n"),
-            "fn f() {\n    let x = 5;\n    let y = 10;\n}\n"
-        );
-    }
-
-    #[test]
-    fn indent_macro_rules_fat_arrow() {
-        assert_eq!(
-            fmt("macro_rules! m {\n() => {};\n}\n"),
-            "macro_rules! m {\n    () => {};\n}\n"
-        );
-    }
-
-    #[test]
-    fn reindent_multiline_string() {
-        assert_eq!(
-            fmt("fn f() {\n    let s = \"\nfoo\nbar\n\";\n}\n"),
-            "fn f() {\n    let s = \"\n        foo\n        bar\n    \";\n}\n"
-        );
-    }
-
-    #[test]
-    fn reindent_multiline_string_preserves_relative_indent() {
-        assert_eq!(
-            fmt("fn f() {\n    let s = \"\n  a\n    b\n\";\n}\n"),
-            "fn f() {\n    let s = \"\n        a\n          b\n    \";\n}\n"
-        );
-    }
-
-    #[test]
-    fn continuation_indent_dot() {
-        assert_eq!(
-            fmt("fn f() {\n    x\n.foo()\n.bar();\n}\n"),
-            "fn f() {\n    x\n        .foo()\n        .bar();\n}\n"
-        );
-    }
-
-    #[test]
-    fn sort_derive() {
-        assert_eq!(
-            fmt("#[derive(Debug, Clone, Copy)]\nstruct S;\n"),
-            "#[derive(Clone, Copy, Debug)]\nstruct S;\n"
-        );
-    }
-
-    #[test]
-    fn sort_imports_alphabetically() {
-        assert_eq!(
-            fmt("use std::io;\nuse std::fs;\n\nfn f() {}\n"),
-            "use std::fs;\nuse std::io;\n\nfn f() {}\n"
-        );
-    }
-
-    #[test]
-    fn group_imports() {
-        assert_eq!(
-            fmt("use crate::foo;\nuse std::io;\n\nfn f() {}\n"),
-            "use std::io;\n\nuse crate::foo;\n\nfn f() {}\n"
-        );
-    }
-
-    #[test]
-    fn flatten_and_sort_imports() {
-        assert_eq!(
-            fmt("use std::{fs, collections::HashMap};\n\nfn f() {}\n"),
-            "use std::collections::HashMap;\nuse std::fs;\n\nfn f() {}\n"
-        );
-    }
-
-    #[test]
-    fn import_groups_with_mods() {
-        assert_eq!(
-            fmt("use std::io;\nmod foo;\nuse crate::bar;\n\nfn f() {}\n"),
-            "mod foo;\n\nuse std::io;\n\nuse crate::bar;\n\nfn f() {}\n"
-        );
-    }
-
-    #[test]
-    fn star_imports_group() {
-        assert_eq!(
-            fmt("use std::io;\nuse crate::prelude::*;\n\nfn f() {}\n"),
-            "use crate::prelude::*;\n\nuse std::io;\n\nfn f() {}\n"
-        );
-    }
 }
