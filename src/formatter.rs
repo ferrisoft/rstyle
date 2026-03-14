@@ -48,6 +48,68 @@ fn sort_derive_args(source: &str) -> String {
 }
 
 
+// ============================
+// === hoist_late_imports ===
+// ============================
+
+fn hoist_late_imports(source: &str) -> String {
+    let parse = SourceFile::parse(source, Edition::CURRENT);
+    let tree = parse.tree();
+    let root = tree.syntax();
+    let mut past_initial = false;
+    let mut seen_import = false;
+    let mut insert_after: usize = 0;
+    let mut late_ranges: Vec<(usize, usize)> = Vec::new();
+    let mut late_texts: Vec<String> = Vec::new();
+    for child in root.children() {
+        match child.kind() {
+            USE => {
+                if past_initial {
+                    let start: usize = child.text_range().start().into();
+                    let end: usize = child.text_range().end().into();
+                    late_ranges.push((start, end));
+                    late_texts.push(child.text().to_string());
+                } else {
+                    seen_import = true;
+                    insert_after = child.text_range().end().into();
+                }
+            }
+            MODULE => {
+                let has_body = child.children().any(|c| c.kind() == ITEM_LIST);
+                if has_body {
+                    if seen_import {
+                        past_initial = true;
+                    }
+                } else if !past_initial {
+                    seen_import = true;
+                    insert_after = child.text_range().end().into();
+                }
+            }
+            _ => {
+                if seen_import {
+                    past_initial = true;
+                }
+            }
+        }
+    }
+    if late_ranges.is_empty() {
+        return source.to_string();
+    }
+    let mut result = source.to_string();
+    for &(start, end) in late_ranges.iter().rev() {
+        let bytes = result.as_bytes();
+        let mut actual_end = end;
+        while actual_end < bytes.len() && matches!(bytes[actual_end], b'\n' | b'\r' | b' ' | b'\t') {
+            actual_end += 1;
+        }
+        result.replace_range(start..actual_end, "");
+    }
+    let insert_text = late_texts.join("\n");
+    result.insert_str(insert_after, &format!("\n{insert_text}"));
+    result
+}
+
+
 // ===============================
 // === sort_and_group_imports ===
 // ===============================
@@ -288,6 +350,7 @@ const MAX_LINE_LENGTH: usize = 120;
 
 pub fn format_source(source: &str) -> String {
     let source = sort_derive_args(source);
+    let source = hoist_late_imports(&source);
     let source = sort_and_group_imports(&source);
     let source = format_whitespace(&source);
     let source = reformat_chains(&source);

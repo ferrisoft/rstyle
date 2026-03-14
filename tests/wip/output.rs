@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+use exponential_moving_average::ExponentialMovingAverage;
+use plot::Component as _;
 use std::fmt::Debug;
 
 use crate::Category;
@@ -143,8 +145,6 @@ pub mod plot {
         }
     }
 }
-
-use plot::Component as _;
 
 
 // =====================
@@ -1329,8 +1329,6 @@ pub mod exponential_moving_average {
         }
     }
 }
-
-use exponential_moving_average::ExponentialMovingAverage;
 
 
 // ==========================================

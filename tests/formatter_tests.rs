@@ -118,6 +118,8 @@ fixture_tests! {
     flatten_and_sort_imports,
     import_groups_with_mods,
     star_imports_group,
+    use_hoisted_to_top,
+    use_inside_mod_stays,
 
     // Derives
     sort_derive,
