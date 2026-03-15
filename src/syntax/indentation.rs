@@ -2,6 +2,8 @@ use ra_ap_syntax::SyntaxKind::*;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::SyntaxToken;
 
+use crate::config::Config;
+
 
 // ============================
 // === compute_indent_level ===
@@ -82,7 +84,7 @@ fn is_macro_repetition_delimiter(token: &SyntaxToken) -> bool {
 // === emit_newline_whitespace ===
 // ==============================
 
-pub(crate) fn emit_newline_whitespace(output: &mut String, ws: &str, next_token: &SyntaxToken) {
+pub(crate) fn emit_newline_whitespace(output: &mut String, ws: &str, next_token: &SyntaxToken, config: &Config) {
     let newline_count = ws.chars().filter(|c| *c == '\n').count();
     for _ in 0..newline_count {
         output.push('\n');
@@ -93,7 +95,7 @@ pub(crate) fn emit_newline_whitespace(output: &mut String, ws: &str, next_token:
     }
     indent_level += count_continuation_ancestors(next_token);
     for _ in 0..indent_level {
-        output.push_str("    ");
+        output.push_str(&config.indent_str());
     }
 }
 

@@ -4,9 +4,8 @@ use ra_ap_syntax::SourceFile;
 use ra_ap_syntax::SyntaxKind::*;
 use ra_ap_syntax::SyntaxNode;
 
+use crate::config::Config;
 use crate::syntax::indentation::compute_indent_level;
-
-const MAX_LINE_LENGTH: usize = 120;
 
 
 // ========================
@@ -20,7 +19,7 @@ pub(crate) struct ChainBreakPoint {
     has_newline: bool,
 }
 
-pub(crate) fn reformat_chains(source: &str) -> String {
+pub(crate) fn reformat_chains(source: &str, config: &Config) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();
     let chain_ranges: Vec<_> = tree
@@ -43,7 +42,7 @@ pub(crate) fn reformat_chains(source: &str) -> String {
             let chain_end: usize = node.text_range().end().into();
             let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
             let line_end = source[chain_end..].find('\n').map(|p| chain_end + p).unwrap_or(source.len());
-            if line_end - line_start <= MAX_LINE_LENGTH {
+            if line_end - line_start <= config.max_line_length {
                 continue;
             }
         }
@@ -65,7 +64,7 @@ pub(crate) fn reformat_chains(source: &str) -> String {
                 .map(|p| after_chain[..p].trim_end().len())
                 .unwrap_or_else(|| after_chain.trim_end().len());
             let total_flat_len = prefix_len + flat_text.len() + suffix_len;
-            if total_flat_len <= MAX_LINE_LENGTH {
+            if total_flat_len <= config.max_line_length {
                 for bp in &break_points {
                     if bp.has_newline {
                         replacements.push((bp.ws_start, bp.dot_offset, String::new()));
@@ -75,7 +74,7 @@ pub(crate) fn reformat_chains(source: &str) -> String {
             }
             // Too long to collapse — break at method dots
             let indent_level = compute_chain_indent(&node);
-            let indent = "    ".repeat(indent_level + 1);
+            let indent = config.indent_str().repeat(indent_level + 1);
             let has_existing_breaks = break_points.iter().any(|bp| bp.has_newline);
             if has_existing_breaks {
                 let first_break_idx = break_points.iter()
@@ -84,7 +83,7 @@ pub(crate) fn reformat_chains(source: &str) -> String {
                 let first_break_bp = &break_points[first_break_idx];
                 let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
                 let first_line_len = first_break_bp.ws_start - line_start;
-                if first_line_len > MAX_LINE_LENGTH {
+                if first_line_len > config.max_line_length {
                     for bp in &break_points[..first_break_idx] {
                         if bp.is_method_call && !bp.has_newline {
                             replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
@@ -104,10 +103,10 @@ pub(crate) fn reformat_chains(source: &str) -> String {
                 }
             }
         } else {
-            // Multi-line chain (closures/blocks) — only break dots on lines > MAX_LINE_LENGTH,
+            // Multi-line chain (closures/blocks) — only break dots on lines > config.max_line_length,
             // and collapse breaks after multi-line content if the resulting line fits.
             let indent_level = compute_chain_indent(&node);
-            let indent = "    ".repeat(indent_level + 1);
+            let indent = config.indent_str().repeat(indent_level + 1);
             for bp in &break_points {
                 if !bp.is_method_call {
                     continue;
@@ -127,7 +126,7 @@ pub(crate) fn reformat_chains(source: &str) -> String {
                         .map(|p| bp.dot_offset + p)
                         .unwrap_or(source.len());
                     let line_len = line_end - line_start;
-                    if line_len > MAX_LINE_LENGTH {
+                    if line_len > config.max_line_length {
                         replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
                     }
                 }

@@ -1,13 +1,12 @@
+use crate::config::Config;
 use crate::formatter::leading_whitespace;
-
-const MAX_LINE_LENGTH: usize = 120;
 
 
 // =============================
 // === format_doc_comments ===
 // =============================
 
-pub(crate) fn format_doc_comments(source: &str) -> String {
+pub(crate) fn format_doc_comments(source: &str, config: &Config) -> String {
     let lines: Vec<&str> = source.split('\n').collect();
     let n = lines.len();
     let mut result: Vec<String> = Vec::new();
@@ -37,7 +36,7 @@ pub(crate) fn format_doc_comments(source: &str) -> String {
             }
         }
         let md_input = block_lines.join("\n");
-        let available_width = MAX_LINE_LENGTH
+        let available_width = config.max_line_length
             .saturating_sub(indent.len())
             .saturating_sub(prefix.len() + 1);
         if available_width < 20 {

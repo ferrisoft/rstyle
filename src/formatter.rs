@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::pass::blank_line::collapse_blank_lines;
 use crate::pass::blank_line::ensure_trailing_newline;
 use crate::pass::chain::reformat_chains;
@@ -16,26 +17,54 @@ use crate::pass::whitespace::format_whitespace;
 // =====================
 
 pub fn format_source(source: &str) -> String {
-    let source = sort_derive_args(source);
-    let source = hoist_late_imports(&source);
-    let source = sort_and_group_imports(&source);
-    let source = format_whitespace(&source);
-    let source = reformat_chains(&source);
-    let source = expand_long_inline_blocks(&source);
-    let source = format_whitespace(&source);
-    let source = expand_long_inline_blocks(&source);
-    let source = format_whitespace(&source);
-    let source = collapse_opening_braces(&source);
-    let source = format_section_headers(&source);
-    let source = collapse_blank_lines(&source);
-    let source = format_doc_comments(&source);
+    format_source_with_config(source, &Config::default())
+}
+
+pub fn format_source_with_config(source: &str, config: &Config) -> String {
+    let mut source = if config.sort_derives {
+        sort_derive_args(source)
+    } else {
+        source.to_string()
+    };
+    if config.hoist_imports {
+        source = hoist_late_imports(&source);
+    }
+    if config.sort_imports {
+        source = sort_and_group_imports(&source);
+    }
+    source = format_whitespace(&source, config);
+    if config.reformat_chains {
+        source = reformat_chains(&source, config);
+    }
+    loop {
+        if config.enforce_line_length {
+            source = expand_long_inline_blocks(&source, config);
+        }
+        let next = format_whitespace(&source, config);
+        if next == source {
+            break;
+        }
+        source = next;
+    }
+    if config.enforce_line_length {
+        source = collapse_opening_braces(&source, config);
+    }
+    if config.format_section_headers {
+        source = format_section_headers(&source);
+    }
+    if config.collapse_blank_lines {
+        source = collapse_blank_lines(&source);
+    }
+    if config.reflow_doc_comments {
+        source = format_doc_comments(&source, config);
+    }
     ensure_trailing_newline(source)
 }
 
 
-// ========================
+// ==========================
 // === leading_whitespace ===
-// ========================
+// ==========================
 
 pub(crate) fn leading_whitespace(line: &str) -> &str {
     let trimmed = line.trim_start();

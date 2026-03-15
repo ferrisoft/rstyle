@@ -3,16 +3,15 @@ use ra_ap_syntax::Edition;
 use ra_ap_syntax::SourceFile;
 use ra_ap_syntax::SyntaxKind::*;
 
+use crate::config::Config;
 use crate::formatter::leading_whitespace;
-
-const MAX_LINE_LENGTH: usize = 120;
 
 
 // ==================================
 // === expand_long_inline_blocks ===
 // ==================================
 
-pub(crate) fn expand_long_inline_blocks(source: &str) -> String {
+pub(crate) fn expand_long_inline_blocks(source: &str, config: &Config) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();
     let mut replacements: Vec<(usize, usize, String)> = Vec::new();
@@ -45,7 +44,7 @@ pub(crate) fn expand_long_inline_blocks(source: &str) -> String {
         }
         let line_start = source[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
         let line_end = source[end..].find('\n').map(|p| end + p).unwrap_or(source.len());
-        if line_end - line_start <= MAX_LINE_LENGTH {
+        if line_end - line_start <= config.max_line_length {
             continue;
         }
         let children: Vec<_> = node.children_with_tokens().collect();
@@ -94,7 +93,7 @@ pub(crate) fn expand_long_inline_blocks(source: &str) -> String {
 // === collapse_opening_braces ===
 // ================================
 
-pub(crate) fn collapse_opening_braces(source: &str) -> String {
+pub(crate) fn collapse_opening_braces(source: &str, config: &Config) -> String {
     let lines: Vec<&str> = source.split('\n').collect();
     let mut result: Vec<String> = Vec::new();
     for line in &lines {
@@ -108,7 +107,7 @@ pub(crate) fn collapse_opening_braces(source: &str) -> String {
             if trimmed.starts_with("where") && !prev_trimmed.is_empty() {
                 let prev = result.last().unwrap();
                 let merged_len = prev.len() + 1 + trimmed.len();
-                if merged_len <= MAX_LINE_LENGTH {
+                if merged_len <= config.max_line_length {
                     result.last_mut().unwrap().push_str(&format!(" {trimmed}"));
                 } else {
                     let indent = leading_whitespace(line);

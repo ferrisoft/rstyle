@@ -1,11 +1,13 @@
 use ra_ap_syntax::SyntaxToken;
 
+use crate::config::Config;
+
 
 // ==============================
 // === reindent_string_token ===
 // ==============================
 
-pub(crate) fn reindent_string_token(output: &mut String, token: &SyntaxToken) {
+pub(crate) fn reindent_string_token(output: &mut String, token: &SyntaxToken, config: &Config) {
     let text = token.text();
     let lines: Vec<&str> = text.split('\n').collect();
     if lines.len() <= 1 {
@@ -15,9 +17,9 @@ pub(crate) fn reindent_string_token(output: &mut String, token: &SyntaxToken) {
     let last_newline = output.rfind('\n').map(|p| p + 1).unwrap_or(0);
     let current_line = &output[last_newline..];
     let visual_indent = current_line.len() - current_line.trim_start().len();
-    let indent_level = visual_indent / 4;
-    let content_indent: String = "    ".repeat(indent_level + 1);
-    let closing_indent: String = "    ".repeat(indent_level);
+    let indent_level = visual_indent / config.indent_width;
+    let content_indent: String = config.indent_str().repeat(indent_level + 1);
+    let closing_indent: String = config.indent_str().repeat(indent_level);
     let last_idx = lines.len() - 1;
     let last_is_just_quote = lines[last_idx].trim() == "\"";
     let content_end = if last_is_just_quote { last_idx } else { last_idx + 1 };
