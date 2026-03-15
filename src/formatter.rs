@@ -356,7 +356,9 @@ pub fn format_source(source: &str) -> String {
     let source = reformat_chains(&source);
     let source = expand_long_inline_blocks(&source);
     let source = format_whitespace(&source);
+    let source = collapse_opening_braces(&source);
     let source = format_section_headers(&source);
+    let source = format_doc_comments(&source);
     ensure_trailing_newline(source)
 }
 
@@ -650,10 +652,24 @@ fn expand_long_inline_blocks(source: &str) -> String {
     let tree = parse.tree();
     let mut replacements: Vec<(usize, usize, String)> = Vec::new();
     for node in tree.syntax().descendants() {
-        if node.kind() != STMT_LIST {
-            continue;
-        }
-        if node.children().count() < 2 {
+        let kind = node.kind();
+        let expandable = match kind {
+            STMT_LIST => node.children().count() >= 2,
+            PARAM_LIST | ARG_LIST | RECORD_EXPR_FIELD_LIST => node.children().count() >= 2,
+            TOKEN_TREE => {
+                let has_curly = node
+                    .first_child_or_token()
+                    .map(|f| f.kind() == L_CURLY)
+                    .unwrap_or(false);
+                let content_count = node
+                    .children_with_tokens()
+                    .filter(|c| !matches!(c.kind(), WHITESPACE | L_CURLY | R_CURLY))
+                    .count();
+                has_curly && content_count >= 3
+            }
+            _ => continue,
+        };
+        if !expandable {
             continue;
         }
         let start: usize = node.text_range().start().into();
@@ -667,11 +683,33 @@ fn expand_long_inline_blocks(source: &str) -> String {
         if line_end - line_start <= MAX_LINE_LENGTH {
             continue;
         }
-        for child in node.children_with_tokens() {
+        let children: Vec<_> = node.children_with_tokens().collect();
+        let break_at_commas_only = kind == TOKEN_TREE;
+        for (idx, child) in children.iter().enumerate() {
             if child.kind() == WHITESPACE {
-                let ws_start: usize = child.text_range().start().into();
-                let ws_end: usize = child.text_range().end().into();
-                replacements.push((ws_start, ws_end, "\n".to_string()));
+                let should_break = if break_at_commas_only {
+                    idx > 0 && matches!(children[idx - 1].kind(), L_CURLY | COMMA)
+                        || children.get(idx + 1).map(|c| c.kind()) == Some(R_CURLY)
+                } else {
+                    true
+                };
+                if should_break {
+                    let ws_start: usize = child.text_range().start().into();
+                    let ws_end: usize = child.text_range().end().into();
+                    replacements.push((ws_start, ws_end, "\n".to_string()));
+                }
+            } else if matches!(child.kind(), L_PAREN | L_BRACK | L_CURLY)
+                && let Some(next) = children.get(idx + 1)
+                && next.kind() != WHITESPACE
+            {
+                let pos: usize = child.text_range().end().into();
+                replacements.push((pos, pos, "\n".to_string()));
+            } else if matches!(child.kind(), R_PAREN | R_BRACK | R_CURLY)
+                && let Some(prev) = children.get(idx.wrapping_sub(1))
+                && prev.kind() != WHITESPACE
+            {
+                let pos: usize = child.text_range().start().into();
+                replacements.push((pos, pos, "\n".to_string()));
             }
         }
     }
@@ -684,6 +722,43 @@ fn expand_long_inline_blocks(source: &str) -> String {
         result.replace_range(start..end, &new_ws);
     }
     result
+}
+
+
+// ================================
+// === collapse_opening_braces ===
+// ================================
+
+fn collapse_opening_braces(source: &str) -> String {
+    let lines: Vec<&str> = source.split('\n').collect();
+    let mut result: Vec<String> = Vec::new();
+    for line in &lines {
+        let trimmed = line.trim();
+        if !result.is_empty() {
+            let prev_trimmed = result.last().map(|l| l.trim().to_string()).unwrap_or_default();
+            if trimmed == "{" && !prev_trimmed.is_empty() && !prev_trimmed.ends_with('{') {
+                result.last_mut().unwrap().push_str(" {");
+                continue;
+            }
+            if trimmed.starts_with("where") && !prev_trimmed.is_empty() {
+                let prev = result.last().unwrap();
+                let merged_len = prev.len() + 1 + trimmed.len();
+                if merged_len <= MAX_LINE_LENGTH {
+                    result.last_mut().unwrap().push_str(&format!(" {trimmed}"));
+                } else {
+                    let indent = leading_whitespace(line);
+                    let after_where = trimmed.strip_prefix("where").unwrap().trim_start();
+                    result.last_mut().unwrap().push_str(" where");
+                    if !after_where.is_empty() {
+                        result.push(format!("{indent}{after_where}"));
+                    }
+                }
+                continue;
+            }
+        }
+        result.push(line.to_string());
+    }
+    result.join("\n")
 }
 
 
@@ -755,6 +830,65 @@ fn is_section_middle(line: &str) -> bool {
 fn leading_whitespace(line: &str) -> &str {
     let trimmed = line.trim_start();
     &line[..line.len() - trimmed.len()]
+}
+
+
+// =============================
+// === format_doc_comments ===
+// =============================
+
+fn format_doc_comments(source: &str) -> String {
+    let lines: Vec<&str> = source.split('\n').collect();
+    let n = lines.len();
+    let mut result: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < n {
+        let trimmed = lines[i].trim();
+        let prefix = if trimmed.starts_with("///") {
+            "///"
+        } else if trimmed.starts_with("//!") {
+            "//!"
+        } else {
+            result.push(lines[i].to_string());
+            i += 1;
+            continue;
+        };
+        let indent = leading_whitespace(lines[i]);
+        let mut block_lines: Vec<&str> = Vec::new();
+        let block_start = i;
+        while i < n {
+            let t = lines[i].trim();
+            if let Some(after_prefix) = t.strip_prefix(prefix) {
+                let content = after_prefix.strip_prefix(' ').unwrap_or(after_prefix);
+                block_lines.push(content);
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        let md_input = block_lines.join("\n");
+        let available_width = MAX_LINE_LENGTH
+            .saturating_sub(indent.len())
+            .saturating_sub(prefix.len() + 1);
+        if available_width < 20 {
+            for line in &lines[block_start..i] {
+                result.push(line.to_string());
+            }
+            continue;
+        }
+        let mut options = comrak::Options::default();
+        options.render.width = available_width;
+        let formatted = comrak::markdown_to_commonmark(&md_input, &options);
+        let formatted = formatted.trim_end();
+        for line in formatted.split('\n') {
+            if line.is_empty() {
+                result.push(format!("{indent}{prefix}"));
+            } else {
+                result.push(format!("{indent}{prefix} {line}"));
+            }
+        }
+    }
+    result.join("\n")
 }
 
 
@@ -871,7 +1005,7 @@ fn reindent_string_token(output: &mut String, token: &SyntaxToken) {
 // ============================
 
 fn compute_indent_level(token: &SyntaxToken) -> usize {
-    let mut level = 0;
+    let mut level: usize = 0;
     let mut node = token.parent();
     while let Some(n) = node {
         if is_indent_node(&n, token) {
@@ -879,7 +1013,18 @@ fn compute_indent_level(token: &SyntaxToken) -> usize {
         }
         node = n.parent();
     }
+    if is_macro_repetition_delimiter(token) {
+        level = level.saturating_sub(1);
+    }
     level
+}
+
+fn is_macro_repetition_delimiter(token: &SyntaxToken) -> bool {
+    matches!(token.kind(), R_PAREN | L_PAREN)
+        && token
+            .parent()
+            .map(|p| p.kind() == TOKEN_TREE && is_macro_repetition(&p))
+            .unwrap_or(false)
 }
 
 
@@ -907,15 +1052,23 @@ fn is_indent_node(node: &SyntaxNode, token: &SyntaxToken) -> bool {
         return !is_delimiter_of(node, token);
     }
     if kind == TOKEN_TREE {
-        let is_brace_or_bracket = node
-            .first_child_or_token()
-            .map(|first| matches!(first.kind(), L_CURLY | L_BRACK))
-            .unwrap_or(false);
-        if is_brace_or_bracket {
-            return !is_delimiter_of(node, token);
+        if is_macro_repetition(node) {
+            return false;
         }
+        return !is_delimiter_of(node, token);
     }
     false
+}
+
+fn is_macro_repetition(node: &SyntaxNode) -> bool {
+    match node.prev_sibling_or_token() {
+        Some(p) if p.kind() == DOLLAR => true,
+        Some(p) if p.kind() == WHITESPACE => p
+            .prev_sibling_or_token()
+            .map(|pp| pp.kind() == DOLLAR)
+            .unwrap_or(false),
+        _ => false,
+    }
 }
 
 
@@ -976,6 +1129,32 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     if pk == POUND {
         return "";
     }
+    // Macro pattern $ metavar: no space after $
+    if pk == DOLLAR && is_in_token_tree(prev) {
+        return "";
+    }
+    // Macro metavar $name:frag — no space around the :
+    if nk == COLON && is_in_token_tree(next) && is_macro_metavar_colon(next) {
+        return "";
+    }
+    if pk == COLON && is_in_token_tree(prev) && is_macro_metavar_colon(prev) {
+        return "";
+    }
+    // Macro repetition ),* )* )+ )? in TOKEN_TREE: no space before operator
+    if matches!(nk, STAR | PLUS) && is_in_token_tree(next)
+        && matches!(pk, R_PAREN | COMMA)
+    {
+        return "";
+    }
+    // &< and *> in TOKEN_TREE (reference/pointer type syntax in macros)
+    if pk == AMP && nk == L_ANGLE && is_in_token_tree(prev) {
+        return "";
+    }
+    if matches!(pk, STAR | PLUS) && nk == R_ANGLE && is_in_token_tree(prev)
+        && prev_non_whitespace_token(prev).map(|t| t.kind() != R_ANGLE).unwrap_or(true)
+    {
+        return "";
+    }
     // Macro ident!: no space before !
     if nk == BANG && pk == IDENT {
         return "";
@@ -984,9 +1163,9 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     if pk == BANG && matches!(nk, L_PAREN | L_BRACK) {
         return "";
     }
-    // => inside TOKEN_TREE (fat arrow split into EQ + R_ANGLE)
-    if pk == EQ && nk == R_ANGLE
-        && prev.parent().map(|p| p.kind()) == Some(TOKEN_TREE) {
+    // => and -> inside TOKEN_TREE (split into EQ/MINUS + R_ANGLE)
+    if matches!(pk, EQ | MINUS) && nk == R_ANGLE
+        && is_in_token_tree(prev) {
             return "";
         }
     // Function call ident(: no space
@@ -1011,8 +1190,10 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
         && prev.parent().map(|p| p.kind()) == Some(FN_PTR_TYPE) {
             return "";
         }
-    // Unary operators: no space after
-    if matches!(pk, MINUS | STAR | AMP | BANG) && is_unary(prev) {
+    // Unary operators: no space after (but not macro repetition * + after ) or ,)
+    if matches!(pk, MINUS | STAR | AMP | BANG) && is_unary(prev)
+        && !is_macro_repetition_op(prev)
+    {
         return "";
     }
     // &'lifetime: no space
@@ -1020,14 +1201,20 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
         return "";
     }
     // Generic angle brackets: no space inside
-    if pk == L_ANGLE && is_in_generic_context(prev) {
+    if pk == L_ANGLE && (is_in_generic_context(prev) || is_turbofish_angle(prev)) {
         return "";
     }
-    if nk == R_ANGLE && is_in_generic_context(next) {
+    if nk == R_ANGLE && (is_in_generic_context(next) || is_turbofish_angle(next)) {
         return "";
     }
     if nk == L_ANGLE && is_in_generic_context(next)
         && next.parent().map(|p| p.kind()) != Some(TYPE_ANCHOR) {
+            return "";
+        }
+    // Turbofish >( in TOKEN_TREE: no space
+    if pk == R_ANGLE && nk == L_PAREN
+        && prev.parent().map(|p| p.kind()) == Some(TOKEN_TREE)
+        && is_turbofish_angle(prev) {
             return "";
         }
     // Adjacent pipes || (empty closure or logical OR in TOKEN_TREE)
@@ -1067,6 +1254,13 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
         }
         return " ";
     }
+    // Default type param T=Value: no space around =
+    if (pk == EQ || nk == EQ)
+        && (prev.parent().map(|p| p.kind()) == Some(TYPE_PARAM)
+            || next.parent().map(|p| p.kind()) == Some(TYPE_PARAM))
+    {
+        return "";
+    }
     // Assignment = and compound assignments
     if pk == EQ || nk == EQ {
         return " ";
@@ -1090,21 +1284,64 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     if matches!(pk, SHL | SHR) || matches!(nk, SHL | SHR) {
         return " ";
     }
+    // Shift operators as two separate angle tokens in TOKEN_TREE: << >>
+    if is_in_token_tree(prev) {
+        if pk == L_ANGLE && nk == L_ANGLE {
+            return "";
+        }
+        if pk == R_ANGLE && nk == R_ANGLE {
+            return "";
+        }
+    }
     // < > as comparison operators (generics already handled above)
-    if pk == L_ANGLE {
+    // Inside TOKEN_TREE, < > are ambiguous — only add spaces when both sides are
+    // value-like (likely comparison), not when adjacent to type-like tokens.
+    if pk == L_ANGLE && !is_in_token_tree(prev) {
         return " ";
     }
-    if nk == L_ANGLE {
+    if nk == L_ANGLE && !is_in_token_tree(next)  {
         return " ";
     }
-    if nk == R_ANGLE {
+    // Space around << (two L_ANGLE) in TOKEN_TREE
+    if nk == L_ANGLE && is_in_token_tree(next)
+        && next.next_token().map(|t| t.kind()) == Some(L_ANGLE)
+        && is_word_like(pk)
+    {
+        return " ";
+    }
+    if pk == L_ANGLE && is_in_token_tree(prev)
+        && prev_non_whitespace_token(prev).map(|t| t.kind()) == Some(L_ANGLE)
+    {
+        return " ";
+    }
+    if nk == R_ANGLE && !is_in_token_tree(next) {
         return " ";
     }
     // > as prev: space if comparison or followed by word-like token
-    if pk == R_ANGLE
+    if pk == R_ANGLE && !is_in_token_tree(prev)
         && (!is_in_generic_context(prev) || is_word_like(nk)) {
             return " ";
         }
+    // Space around >> (two R_ANGLE) in TOKEN_TREE
+    if nk == R_ANGLE && is_in_token_tree(next)
+        && next.next_token().map(|t| t.kind()) == Some(R_ANGLE)
+        && is_word_like(pk)
+    {
+        return " ";
+    }
+    if pk == R_ANGLE && is_in_token_tree(prev)
+        && prev_non_whitespace_token(prev).map(|t| t.kind()) == Some(R_ANGLE)
+    {
+        return " ";
+    }
+    // => and -> in TOKEN_TREE (R_ANGLE preceded by EQ or MINUS): space after
+    if pk == R_ANGLE && is_in_token_tree(prev)
+        && prev_non_whitespace_token(prev)
+            .map(|t| matches!(t.kind(), EQ | MINUS))
+            .unwrap_or(false)
+    {
+        return " ";
+    }
     // Binary arithmetic/bitwise (non-unary)
     if is_binary_op_token(pk) && !is_unary(prev) {
         return " ";
@@ -1125,11 +1362,11 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     if pk == R_CURLY {
         return " ";
     }
-    // Keywords: space around
-    if is_keyword_kind(pk) {
+    // Keywords: space around (but not after < or before > in TOKEN_TREE — macro type syntax)
+    if is_keyword_kind(pk) && !(nk == R_ANGLE && is_in_token_tree(next)) {
         return " ";
     }
-    if is_keyword_kind(nk) {
+    if is_keyword_kind(nk) && !(pk == L_ANGLE && is_in_token_tree(prev)) {
         return " ";
     }
     // BANG before word-like: space (e.g., macro_rules! my_macro)
@@ -1149,6 +1386,85 @@ fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
         return " ";
     }
     ""
+}
+
+
+// ========================
+// === is_in_token_tree ===
+// ========================
+
+fn is_macro_repetition_op(token: &SyntaxToken) -> bool {
+    matches!(token.kind(), STAR | PLUS)
+        && is_in_token_tree(token)
+        && prev_non_whitespace_token(token)
+            .map(|t| matches!(t.kind(), R_PAREN | COMMA))
+            .unwrap_or(false)
+}
+
+fn is_in_token_tree(token: &SyntaxToken) -> bool {
+    token.parent().map(|p| p.kind()) == Some(TOKEN_TREE)
+}
+
+
+// ===============================
+// === is_macro_metavar_colon ===
+// ===============================
+
+fn is_macro_metavar_colon(colon: &SyntaxToken) -> bool {
+    let prev = match prev_non_whitespace_token(colon) {
+        Some(t) => t,
+        None => return false,
+    };
+    if !matches!(prev.kind(), IDENT) && !is_keyword_kind(prev.kind()) {
+        return false;
+    }
+    prev_non_whitespace_token(&prev)
+        .map(|t| t.kind() == DOLLAR)
+        .unwrap_or(false)
+}
+
+
+// ==========================
+// === is_turbofish_angle ===
+// ==========================
+
+fn is_double_colon(token: &SyntaxToken) -> bool {
+    token.kind() == COLON2
+        || (token.kind() == COLON
+            && prev_non_whitespace_token(token)
+                .map(|t| t.kind() == COLON)
+                .unwrap_or(false))
+}
+
+fn is_turbofish_angle(token: &SyntaxToken) -> bool {
+    if token.parent().map(|p| p.kind()) != Some(TOKEN_TREE) {
+        return false;
+    }
+    match token.kind() {
+        L_ANGLE => prev_non_whitespace_token(token)
+            .map(|t| is_double_colon(&t))
+            .unwrap_or(false),
+        R_ANGLE => {
+            let mut depth = 1;
+            let mut tok = token.prev_token();
+            while let Some(t) = tok {
+                match t.kind() {
+                    R_ANGLE => depth += 1,
+                    L_ANGLE if depth > 1 => depth -= 1,
+                    L_ANGLE => {
+                        return prev_non_whitespace_token(&t)
+                            .map(|p| is_double_colon(&p))
+                            .unwrap_or(false);
+                    }
+                    WHITESPACE => {}
+                    _ => {}
+                }
+                tok = t.prev_token();
+            }
+            false
+        }
+        _ => false,
+    }
 }
 
 

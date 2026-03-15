@@ -39,6 +39,9 @@ to do so. If a proposed change would break existing tests, ask the user what to 
 before proceeding. When asking, implement the change first, run the tests, and show
 the user the affected tests with their diffs (old expected vs new actual output).
 
+**IMPORTANT**: After implementing any formatting rule or fix, ALWAYS add a test for
+it in `tests/fixtures/` and register it in the `fixture_tests!` macro. No exception.
+
 ## Key Design Decisions
 - Uses `ra_ap_syntax` (rust-analyzer's parser) for lossless CST parsing.
 - Iterates tokens in document order, applying spacing rules between adjacent

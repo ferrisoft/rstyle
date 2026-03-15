@@ -67,6 +67,7 @@ fixture_tests! {
     qualified_path_no_spaces,
     lifetime_before_bracket,
     lifetime_before_bracket_nested,
+    type_param_default_no_spaces,
 
     // Trailing whitespace & newlines
     trailing_whitespace_removed,
@@ -83,6 +84,7 @@ fixture_tests! {
     indent_fixes_wrong_indent,
     indent_macro_rules_fat_arrow,
     indent_fn_params_multiline,
+    expand_long_fn_params,
 
     // Strings
     reindent_multiline_string,
@@ -91,6 +93,10 @@ fixture_tests! {
     // Line breaks
     preserves_line_breaks,
     multiple_blank_lines_preserved,
+
+    collapse_brace_to_prev_line,
+    where_on_same_line,
+    where_long_splits_bounds,
 
     // Control flow
     for_loop,
@@ -103,9 +109,17 @@ fixture_tests! {
     macro_reference,
     macro_empty_closure,
     macro_braces,
+    turbofish_in_macro,
+    macro_angle_brackets_no_spaces,
+    macro_pattern_spacing,
+    macro_repetition_space_before_brace,
+    macro_shift_operators,
+    macro_arrows,
+    macro_ref_angle_no_spaces,
 
     // Structs & impls
     struct_literal,
+    expand_long_struct_literal,
     impl_block,
     attribute,
     already_formatted_sample,
@@ -143,4 +157,10 @@ fixture_tests! {
     section_header_border_length,
     section_header_blank_lines,
     section_header_start_of_file,
+
+    // Doc comments
+    doc_comment_reflow_long,
+    doc_comment_join_short,
+    doc_comment_preserve_code_block,
+    doc_comment_inner,
 }
