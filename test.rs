@@ -159,3 +159,20 @@ app.mount_to(root_html).warn();
 drop(app_state);
 std::mem::forget(app);
 }
+
+
+    web_document
+        .with_element_by_id("gl-root", |root| {
+        let root_html = root.dyn_as_html_element()
+            .expect("Element 'gl-root' is not an HtmlElement.");
+        app.mount_to(root_html).warn();
+    })
+        .warn();
+
+
+    web_document
+        .with_element_by_id("gl-root", |root| {
+            let root_html = root.dyn_as_html_element()
+                .expect("Element 'gl-root' is not an HtmlElement.");
+            app.mount_to(root_html).warn();
+        }).warn();
