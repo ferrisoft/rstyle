@@ -356,8 +356,11 @@ pub fn format_source(source: &str) -> String {
     let source = reformat_chains(&source);
     let source = expand_long_inline_blocks(&source);
     let source = format_whitespace(&source);
+    let source = expand_long_inline_blocks(&source);
+    let source = format_whitespace(&source);
     let source = collapse_opening_braces(&source);
     let source = format_section_headers(&source);
+    let source = collapse_blank_lines(&source);
     let source = format_doc_comments(&source);
     ensure_trailing_newline(source)
 }
@@ -447,7 +450,13 @@ fn reformat_chains(source: &str) -> String {
             *other != range && other.start() <= range.start() && range.end() <= other.end()
         });
         if is_nested {
-            continue;
+            let chain_start: usize = node.text_range().start().into();
+            let chain_end: usize = node.text_range().end().into();
+            let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let line_end = source[chain_end..].find('\n').map(|p| chain_end + p).unwrap_or(source.len());
+            if line_end - line_start <= MAX_LINE_LENGTH {
+                continue;
+            }
         }
         let break_points = collect_chain_break_points(&node, source);
         if break_points.is_empty() {
@@ -654,18 +663,18 @@ fn expand_long_inline_blocks(source: &str) -> String {
     for node in tree.syntax().descendants() {
         let kind = node.kind();
         let expandable = match kind {
-            STMT_LIST => node.children().count() >= 2,
-            PARAM_LIST | ARG_LIST | RECORD_EXPR_FIELD_LIST => node.children().count() >= 2,
+            STMT_LIST => node.children().count() >= 1,
+            PARAM_LIST | RECORD_EXPR_FIELD_LIST => node.children().count() >= 2,
             TOKEN_TREE => {
-                let has_curly = node
-                    .first_child_or_token()
-                    .map(|f| f.kind() == L_CURLY)
-                    .unwrap_or(false);
+                let first = node.first_child_or_token().map(|f| f.kind());
+                let has_curly = first == Some(L_CURLY);
+                let is_macro_call_paren = first == Some(L_PAREN)
+                    && node.parent().map(|p| p.kind()) == Some(MACRO_CALL);
                 let content_count = node
                     .children_with_tokens()
-                    .filter(|c| !matches!(c.kind(), WHITESPACE | L_CURLY | R_CURLY))
+                    .filter(|c| !matches!(c.kind(), WHITESPACE | L_CURLY | R_CURLY | L_PAREN | R_PAREN))
                     .count();
-                has_curly && content_count >= 3
+                (has_curly || is_macro_call_paren) && content_count >= 1
             }
             _ => continue,
         };
@@ -758,6 +767,29 @@ fn collapse_opening_braces(source: &str) -> String {
         }
         result.push(line.to_string());
     }
+    result.join("\n")
+}
+
+
+// ============================
+// === collapse_blank_lines ===
+// ============================
+
+fn collapse_blank_lines(source: &str) -> String {
+    let lines: Vec<&str> = source.split('\n').collect();
+    let mut result: Vec<&str> = Vec::new();
+    let mut blank_count: usize = 0;
+    for line in &lines {
+        if line.trim().is_empty() {
+            blank_count += 1;
+        } else {
+            let max_blanks = if is_section_border(line.trim()) { 2 } else { 1 };
+            result.extend(std::iter::repeat_n("", blank_count.min(max_blanks)));
+            blank_count = 0;
+            result.push(line);
+        }
+    }
+    result.extend(std::iter::repeat_n("", blank_count.min(1)));
     result.join("\n")
 }
 
@@ -1056,11 +1088,6 @@ fn is_indent_node(node: &SyntaxNode, token: &SyntaxToken) -> bool {
     }
     if kind == TOKEN_TREE {
         if is_macro_repetition(node) {
-            return false;
-        }
-        if node.first_child_or_token().map(|f| f.kind()) == Some(L_PAREN)
-            && node.parent().map(|p| p.kind()) == Some(MACRO_CALL)
-        {
             return false;
         }
         return !is_delimiter_of(node, token);

@@ -92,26 +92,26 @@ impl Default for View {
     fn default() -> Self {
         Self {
             xy: v2!(
-            ProjectionRange {
-                range: Range {
-                    start: Dec!(0),
-                    end: Dec!(0)
+                ProjectionRange {
+                    range: Range {
+                        start: Dec!(0),
+                        end: Dec!(0)
+                    },
+                    projection: Projection {
+                        origin: Dec!(0),
+                        scale: Dec!(1_000_000)
+                    }
                 },
-                projection: Projection {
-                    origin: Dec!(0),
-                    scale: Dec!(1_000_000)
+                ProjectionRange {
+                    range: Range {
+                        start: Dec!(0),
+                        end: Dec!(0)
+                    },
+                    projection: Projection {
+                        origin: Dec!(0),
+                        scale: Dec!(1_000)
+                    }
                 }
-            },
-            ProjectionRange {
-                range: Range {
-                    start: Dec!(0),
-                    end: Dec!(0)
-                },
-                projection: Projection {
-                    origin: Dec!(0),
-                    scale: Dec!(1_000)
-                }
-            }
             )
         }
     }
@@ -224,7 +224,13 @@ impl Layers {
     const PLOT_AXIS_HIGHLIGHT_LABEL_Z_INDEX: i32 = 40;
 
     pub fn new(
-        ctx: p!(&<mut mesh, mut geometry, mut material, mut scene, font_atlas>Ctx),
+        ctx: p!(
+            &<mut mesh,
+            mut geometry,
+            mut material,
+            mut scene,
+            font_atlas>Ctx
+        ),
         root_scene_handle: Ptr<Scene>
     ) -> Self {
         let plot_axis_background = rect::Mesh::new(p!(ctx));
@@ -410,11 +416,7 @@ macro_rules! css {
     };
 }
 
-
-
-
 /// /////////////////////
-
 
 trait OptionCallbackRunner {
     type Args;
@@ -435,9 +437,6 @@ pub mod dom {
     pub type AnyElement = Rc<dyn AsRef<web::HtmlElement>>;
     pub type Elements = Vec<AnyElement>;
 }
-
-
-
 
 fn parse_style(properties: &str) -> Vec<(&str, &str)> {
     let mut out = vec![];
@@ -978,45 +977,45 @@ impl Component for TrafficLights {
 
 css!("
     body {
-        background-color: rgb(52 52 52 / 50%);
+    background-color: rgb(52 52 52 / 50%);
     }
 ");
 
 css!("
     :root {
-        --accent-color: rgba(236, 103, 19, 1);
-        --button-height: 32px;
-        --selected-opacity: 0.8;
-        --not-selected-opacity: 0.3;
-        --hint-opacity: 0.3;
+    --accent-color: rgba(236, 103, 19, 1);
+    --button-height: 32px;
+    --selected-opacity: 0.8;
+    --not-selected-opacity: 0.3;
+    --hint-opacity: 0.3;
     }
 
     .button {
-        background-color: rgba(255,255,255,0.0);
-        opacity: 1;
-        transition: all 0.3s ease-in-out;
-        border-radius: 100px;
-        height: var(--button-height);
+    background-color: rgba(255,255,255,0.0);
+    opacity: 1;
+    transition: all 0.3s ease-in-out;
+    border-radius: 100px;
+    height: var(--button-height);
 
-        &.hovered {
-            // background-color: rgba(255,255,255,0.2);
-        }
+    &.hovered {
+    // background-color: rgba(255,255,255,0.2);
+    }
 
-        &.selected {
-            // background-color: rgba(255,255,255,0.2);
-        }
+    &.selected {
+    // background-color: rgba(255,255,255,0.2);
+    }
 
-        &.not-selected {
-            opacity: var(--not-selected-opacity);
-        }
+    &.not-selected {
+    opacity: var(--not-selected-opacity);
+    }
 
-        &.not-selected.hovered {
-            opacity: 1;
-        }
+    &.not-selected.hovered {
+    opacity: 1;
+    }
 
-        &.pressed {
-            // background-color: rgba(255,255,255,0.2);
-        }
+    &.pressed {
+    // background-color: rgba(255,255,255,0.2);
+    }
     }
 ");
 
@@ -1159,18 +1158,17 @@ impl DomRenderer for Group<Button> {
 
 css!("
     .smooth-shadow {
-        box-shadow: 0px 0px 1px rgba(3, 7, 18, 0.02),
-            0px 0px 4px rgba(3, 7, 18, 0.03),
-            0px 0px 9px rgba(3, 7, 18, 0.05),
-            0px 0px 15px rgba(3, 7, 18, 0.06),
-            0px 0px 24px rgba(3, 7, 18, 0.08);
+    box-shadow: 0px 0px 1px rgba(3, 7, 18, 0.02),
+    0px 0px 4px rgba(3, 7, 18, 0.03),
+    0px 0px 9px rgba(3, 7, 18, 0.05),
+    0px 0px 15px rgba(3, 7, 18, 0.06),
+    0px 0px 24px rgba(3, 7, 18, 0.08);
     }
 ");
 
 css!("
     input::placeholder { color: var(--color-placeholder); }
 ");
-
 
 pub trait FuzzyMatch {
     fn fuzzy_match(&mut self, matcher: &mut nucleo::Matcher, needle: Utf32Str<'_>) -> Option<u32>;
@@ -1251,14 +1249,14 @@ impl Component for Entry<AnyEntry> {
     fn render(&self) -> impl IntoElement {
         match &self.entry {
             // FIXME: CLONES
-            AnyEntry::Tool(tool) => Entry { label: self.label.clone(), entry: tool, action: self.action.clone() }
+            AnyEntry::Tool(tool) => Entry { label: self.label
+                    .clone(), entry: tool, action: self.action
+                    .clone() }
                 .render()
                 .into_element(),
-            AnyEntry::Setting(setting) => Entry {
-                label: self.label.clone(),
-                entry: setting,
-                action: self.action.clone()
-            }
+            AnyEntry::Setting(setting) => Entry { label: self.label
+                    .clone(), entry: setting, action: self.action
+                    .clone() }
                 .render()
                 .into_element(),
         }
@@ -1291,9 +1289,9 @@ impl FuzzyMatch for Tool {
 
 css!("
     .searchable-text {
-        & .matched {
-            color: var(--accent-color);
-        }
+    & .matched {
+    color: var(--accent-color);
+    }
     }
 ");
 
@@ -1347,15 +1345,12 @@ impl<T> Component for Searchable<T> {
             out.push((match_len, true));
         }
 
-
         let mut chars_iter = chars.into_iter();
 
         let spans = out.into_iter().map(|(len, is_matched)| {
             let str = chars_iter.by_ref().take(len).collect::<String>();
             Element::new(
-            Span::new()
-                .class(if is_matched { "matched" } else { "unmatched" })
-                .children(elements![str])
+            Span::new().class(if is_matched { "matched" } else { "unmatched" }).children(elements![str])
             )
         }).collect::<Vec<_>>();
 
@@ -1469,8 +1464,8 @@ impl FuzzyMatch for Setting {
 
 css!("
     input:focus {
-        box-shadow: 0px 0px 0px 1px var(--accent-color);
-        border-radius: 4px;
+    box-shadow: 0px 0px 0px 1px var(--accent-color);
+    border-radius: 4px;
     }
 ");
 
@@ -1582,7 +1577,6 @@ fn init_global_database() -> Rc<RefCell<GlobalDatabase>> {
             Entry::new("tools / cross_line", AnyEntry::Tool(Tool::new(ferris_trader_icons::CROSS_LINE)), Action::None),
             // ])),
 
-
             Entry::new("settings /", AnyEntry::Tool(Tool::new(ferris_trader_icons::TREND_LINE)), Action::None),
             Entry::new("settings / window_width", AnyEntry::Setting(Setting::new(ferris_trader_icons::WINDOW_WIDTH, SettingValue::px(1350))), Action::None),
             Entry::new("settings / window_height", AnyEntry::Setting(Setting::new(ferris_trader_icons::WINDOW_HEIGHT, SettingValue::px(850))), Action::None),
@@ -1604,23 +1598,23 @@ fn init_global_database() -> Rc<RefCell<GlobalDatabase>> {
 //         }
 css!("
     .universal-search {
-        & .row {
-            opacity: 0.8;
-        }
-        & .row.hovered {
-            opacity: 1;
-            background-color: rgba(255, 255, 255, 0.5);
-        }
-        & .row.selected {
-            opacity: 1;
-            background-color: rgba(255, 255, 255, 1.0);
-        }
+    & .row {
+    opacity: 0.8;
+    }
+    & .row.hovered {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.5);
+    }
+    & .row.selected {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 1.0);
+    }
     }
 
     .breadcrumbs {
-        & .not-selected {
-            opacity: 0.3;
-        }
+    & .not-selected {
+    opacity: 0.3;
+    }
     }
 ");
 
@@ -1796,11 +1790,14 @@ impl DomRenderer for UniversalSearch {
                     let result = entry.fuzzy_match(&mut matcher, needle_utf32.slice(base_len..));
                     (result, entry)
                 }).filter(|(_result, entry)| {
-                    let last_match = entry.label.matched_indices.last().copied().unwrap_or(0) as usize + entry.label.char_skip;
-                    let last_slash = entry.label.string[0..entry.label.string.len() - 1].rfind('/').map_or(
-                    0,
-                        |i| i + 1
-                    );
+                    let last_match = entry.label.matched_indices
+                        .last()
+                        .copied()
+                        .unwrap_or(0) as usize + entry.label.char_skip;
+                    let last_slash = entry.label.string[0..entry.label.string
+                        .len() - 1]
+                        .rfind('/')
+                        .map_or(0, |i| i + 1);
                     last_slash <= last_match
                 })
                     .filter_map(|(result, entry)| result.map(|r| (r, entry)))
@@ -1842,7 +1839,6 @@ impl DomRenderer for UniversalSearch {
                     )
                 }).collect::<Vec<Element>>();
 
-
                 current_rows.set(matches.iter().map(|t| t.1.clone()).collect());
 
                 let rows_container = Div::new()
@@ -1865,7 +1861,6 @@ impl DomRenderer for UniversalSearch {
                 }
             }
         });
-
 
         Effect::new(move |_| {
             let needle_str = needle.get();
@@ -1911,7 +1906,6 @@ impl DomRenderer for UniversalSearch {
                 }
             }
         });
-
 
         let search_input = Div::new()
             .class("panel")
@@ -2024,7 +2018,9 @@ impl DomRenderer for UniversalSearch {
                                                         let needle_str_trimmed = needle_str.trim_end();
                                                         if needle_str_trimmed.ends_with('/') {
                                                             let new_needle = remove_last_segment(needle_str_trimmed);
-                                                            let new_needle = if new_needle.is_empty() { new_needle } else {
+                                                            let new_needle = if new_needle.is_empty() {
+                                                                new_needle
+                                                            } else {
                                                                 format!("{new_needle}  ")
                                                             };
                                                             needle.set(new_needle);
@@ -2050,7 +2046,9 @@ impl DomRenderer for UniversalSearch {
             ]);
 
         let max_result_count = 15.5;
-        let max_height = format!("calc(1px * {max_result_count} * var(--theme-row-height) + 1px * var(--theme-panel-padding))");
+        let max_height = format!(
+            "calc(1px * {max_result_count} * var(--theme-row-height) + 1px * var(--theme-panel-padding))"
+        );
 
         let search_results = Div::new()
             .class("panel")
@@ -2115,7 +2113,6 @@ impl DomRenderer for UniversalSearch {
                     ])
             ]);
 
-
         let div = Div::new()
             .class("universal-search")
             .style("
@@ -2156,15 +2153,15 @@ pub struct BackgroundNoiseFilter;
 impl DomRenderer for BackgroundNoiseFilter {
     fn render_dom(&self) -> dom::Elements {
         let svg = r#"
-                <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
-                     <filter id="BackgroundNoiseFilter" x="0" y="0" width="100%" height="100%">
-                         <feTurbulence
-                             type="fractalNoise"
-                             baseFrequency="1.3"
-                             numOctaves="1"
-                             stitchTiles="stitch"/>
-                     </filter>
-                 </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+            <filter id="BackgroundNoiseFilter" x="0" y="0" width="100%" height="100%">
+            <feTurbulence
+            type="fractalNoise"
+            baseFrequency="1.3"
+            numOctaves="1"
+            stitchTiles="stitch"/>
+            </filter>
+            </svg>
             "#;
         render(&svg)
     }
@@ -2175,11 +2172,14 @@ pub struct PanelBackground {
     selected: bool
 }
 
-
 impl DomRenderer for PanelBackground {
     fn render_dom(&self) -> dom::Elements {
         let _blur = blur_chain(8, 2, 5);
-        let background_color = if self.selected { "rgba(255,255,255,1)" } else { "var(--theme-panel-background-color)" };
+        let background_color = if self.selected {
+            "rgba(255,255,255,1)"
+        } else {
+            "var(--theme-panel-background-color)"
+        };
         let div = Div::new()
             .class("panel-background")
             .style("
@@ -2315,9 +2315,6 @@ impl DomRenderer for DomApp {
     }
 }
 
-
-
-
 pub mod universal_search {
     thrs::message_bus::message! {
         pub enum Event {
@@ -2327,11 +2324,10 @@ pub mod universal_search {
     }
 }
 
-
 #[wasm_bindgen(start)]
 pub async fn main() {
     log!("::: {}", serde_json::to_string(&universal_search::Event::Open)
-        .expect("Failed to serialize universal_search::Event."));
+            .expect("Failed to serialize universal_search::Event."));
 
     mount_registered_global_css().expect("Failed to mount global CSS styles.");
     any_spawner::Executor::init_wasm_bindgen().warn();

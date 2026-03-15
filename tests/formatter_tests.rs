@@ -94,6 +94,7 @@ fixture_tests! {
     // Line breaks
     preserves_line_breaks,
     multiple_blank_lines_preserved,
+    collapse_blank_lines,
 
     collapse_brace_to_prev_line,
     where_on_same_line,
@@ -102,6 +103,7 @@ fixture_tests! {
     // Control flow
     for_loop,
     if_else,
+    expand_long_inline_if_else,
     match_arms_multiline,
 
     // Macros
@@ -118,6 +120,7 @@ fixture_tests! {
     macro_arrows,
     macro_ref_angle_no_spaces,
     macro_call_string_indent,
+    expand_long_macro_call_args,
 
     // Structs & impls
     struct_literal,
@@ -148,6 +151,7 @@ fixture_tests! {
     chain_field_access_not_broken,
     chain_user_field_break_preserved,
     chain_closure_body_indent,
+    chain_breaks_before_arg_expansion,
     chain_already_correct,
     chain_preserve_break_after_multiline_closure,
     expand_long_inline_closure,
