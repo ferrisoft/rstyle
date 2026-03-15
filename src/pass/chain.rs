@@ -19,6 +19,8 @@ pub(crate) struct ChainBreakPoint {
     has_newline: bool,
 }
 
+/// Reformats method chains that exceed `max_line_length`. Collapses short chains onto one line;
+/// breaks long chains at method-call dots (field-access dots are not auto-broken).
 pub(crate) fn reformat_chains(source: &str, config: &Config) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();

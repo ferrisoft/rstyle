@@ -11,6 +11,8 @@ use crate::formatter::leading_whitespace;
 // === expand_long_inline_blocks ===
 // ==================================
 
+/// Expands single-line blocks (`{ ... }`, param lists, etc.) onto multiple lines when the
+/// containing line exceeds `max_line_length`.
 pub(crate) fn expand_long_inline_blocks(source: &str, config: &Config) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();
@@ -93,6 +95,8 @@ pub(crate) fn expand_long_inline_blocks(source: &str, config: &Config) -> String
 // === collapse_opening_braces ===
 // ================================
 
+/// Collapses a lone `{` on its own line back onto the previous line (e.g. after `fn foo()\n{`),
+/// and merges standalone `where` clauses with the preceding signature when they fit.
 pub(crate) fn collapse_opening_braces(source: &str, config: &Config) -> String {
     let lines: Vec<&str> = source.split('\n').collect();
     let mut result: Vec<String> = Vec::new();

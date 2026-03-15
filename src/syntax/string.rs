@@ -7,6 +7,9 @@ use crate::config::Config;
 // === reindent_string_token ===
 // ==============================
 
+/// Re-indents a multiline string literal to match the surrounding code's indentation level.
+/// Content lines get indent+1; closing quote gets indent+0. Relative indentation within the
+/// string is preserved.
 pub(crate) fn reindent_string_token(output: &mut String, token: &SyntaxToken, config: &Config) {
     let text = token.text();
     let lines: Vec<&str> = text.split('\n').collect();

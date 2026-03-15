@@ -5,6 +5,7 @@ use crate::pass::section_header::is_section_border;
 // === collapse_blank_lines ===
 // ============================
 
+/// Collapses runs of multiple blank lines into at most one (two before section headers).
 pub(crate) fn collapse_blank_lines(source: &str) -> String {
     let lines: Vec<&str> = source.split('\n').collect();
     let mut result: Vec<&str> = Vec::new();
@@ -28,6 +29,7 @@ pub(crate) fn collapse_blank_lines(source: &str) -> String {
 // === ensure_trailing_newline ===
 // ===============================
 
+/// Appends a trailing newline if the string doesn't already end with one.
 pub(crate) fn ensure_trailing_newline(mut s: String) -> String {
     if !s.ends_with('\n') {
         s.push('\n');

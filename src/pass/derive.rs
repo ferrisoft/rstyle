@@ -8,6 +8,7 @@ use ra_ap_syntax::SyntaxKind::*;
 // === sort_derive_args ===
 // ========================
 
+/// Sorts derive macro arguments alphabetically: `#[derive(Debug, Clone)]` -> `#[derive(Clone, Debug)]`.
 pub(crate) fn sort_derive_args(source: &str) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();

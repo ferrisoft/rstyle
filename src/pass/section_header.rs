@@ -5,6 +5,8 @@ use crate::formatter::leading_whitespace;
 // === format_section_headers ===
 // ================================
 
+/// Normalizes `// === Name ===` section headers: fixes border length, ensures consistent blank
+/// lines around each header, and preserves indentation.
 pub(crate) fn format_section_headers(source: &str) -> String {
     let lines: Vec<&str> = source.split('\n').collect();
     let n = lines.len();

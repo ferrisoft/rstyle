@@ -9,6 +9,8 @@ use ra_ap_syntax::SyntaxNode;
 // === hoist_late_imports ===
 // ==========================
 
+/// Moves `use` statements that appear after non-import items back up to the import section at the
+/// top of the file.
 pub(crate) fn hoist_late_imports(source: &str) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();
@@ -80,6 +82,8 @@ pub(crate) enum ImportGroup {
     PubReexport,
 }
 
+/// Flattens multi-imports to one-per-line, sorts alphabetically, and groups with blank-line
+/// separators. Group order: mod declarations, star imports, foreign, crate, pub re-exports.
 pub(crate) fn sort_and_group_imports(source: &str) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();

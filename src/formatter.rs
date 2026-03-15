@@ -16,10 +16,14 @@ use crate::pass::whitespace::format_whitespace;
 // === format_source ===
 // =====================
 
+/// Formats Rust source code using default configuration.
 pub fn format_source(source: &str) -> String {
     format_source_with_config(source, &Config::default())
 }
 
+/// Formats Rust source code by running all enabled formatting passes in sequence.
+/// The pipeline is: derives -> imports -> whitespace -> chains -> line-length -> whitespace
+/// (fixpoint loop) -> section headers -> blank lines -> doc comments -> trailing newline.
 pub fn format_source_with_config(source: &str, config: &Config) -> String {
     let mut source = if config.sort_derives {
         sort_derive_args(source)
@@ -66,6 +70,7 @@ pub fn format_source_with_config(source: &str, config: &Config) -> String {
 // === leading_whitespace ===
 // ==========================
 
+/// Returns the leading whitespace prefix of a line.
 pub(crate) fn leading_whitespace(line: &str) -> &str {
     let trimmed = line.trim_start();
     &line[..line.len() - trimmed.len()]

@@ -6,6 +6,8 @@ use crate::formatter::leading_whitespace;
 // === format_doc_comments ===
 // =============================
 
+/// Reflows doc comments (`///` and `//!`) so that lines wrap within `max_line_length`, using
+/// commonmark-aware reflow to preserve Markdown structure.
 pub(crate) fn format_doc_comments(source: &str, config: &Config) -> String {
     let lines: Vec<&str> = source.split('\n').collect();
     let n = lines.len();

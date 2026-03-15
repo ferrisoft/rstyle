@@ -8,6 +8,8 @@ use ra_ap_syntax::SyntaxToken;
 // =======================
 
 #[inline(always)]
+/// Decides the horizontal whitespace between two adjacent non-whitespace tokens on the same line.
+/// Returns `""` (no space), `" "` (one space), based on Rust syntax rules.
 pub(crate) fn compute_spacing(prev: &SyntaxToken, next: &SyntaxToken) -> &'static str {
     let pk = prev.kind();
     let nk = next.kind();

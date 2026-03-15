@@ -14,6 +14,8 @@ use crate::syntax::string::reindent_string_token;
 // === format_whitespace ===
 // =========================
 
+/// Normalizes horizontal spacing and indentation based on CST structure. Preserves line breaks;
+/// only modifies the whitespace between tokens on the same line and the indentation at line starts.
 pub(crate) fn format_whitespace(source: &str, config: &Config) -> String {
     let parse = SourceFile::parse(source, Edition::CURRENT);
     let tree = parse.tree();

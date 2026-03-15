@@ -9,6 +9,8 @@ use crate::config::Config;
 // === compute_indent_level ===
 // ============================
 
+/// Computes the indentation depth (number of indent levels) for a token by walking up the CST.
+/// Delimiter tokens (`{`, `}`, etc.) stay at the parent's level.
 pub(crate) fn compute_indent_level(token: &SyntaxToken) -> usize {
     let mut level: usize = 0;
     let mut node = token.parent();
@@ -84,6 +86,8 @@ fn is_macro_repetition_delimiter(token: &SyntaxToken) -> bool {
 // === emit_newline_whitespace ===
 // ==============================
 
+/// Emits preserved newlines followed by computed indentation for the next token. Adds +1 indent
+/// for continuation lines starting with `.` (method chains).
 pub(crate) fn emit_newline_whitespace(output: &mut String, ws: &str, next_token: &SyntaxToken, config: &Config) {
     let newline_count = ws.chars().filter(|c| *c == '\n').count();
     for _ in 0..newline_count {
