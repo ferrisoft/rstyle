@@ -17,7 +17,7 @@ pub(crate) fn reindent_string_token(output: &mut String, token: &SyntaxToken, co
         output.push_str(text);
         return;
     }
-    let last_newline = output.rfind('\n').map(|p| p + 1).unwrap_or(0);
+    let last_newline = output.rfind('\n').map_or(0, |p| p + 1);
     let current_line = &output[last_newline..];
     let visual_indent = current_line.len() - current_line.trim_start().len();
     let indent_level = visual_indent / config.indent_width;

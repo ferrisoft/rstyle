@@ -4,6 +4,7 @@
 
 /// Formatter configuration. All options have sensible defaults; load overrides from
 /// `rustformat.toml` or construct with `Config::default()`.
+#[derive(Clone, Copy, Debug)]
 pub struct Config {
     /// Maximum allowed line length before the formatter breaks lines. Default: 120.
     pub max_line_length: usize,
@@ -28,8 +29,8 @@ pub struct Config {
 }
 
 impl Default for Config {
-    fn default() -> Config {
-        Config {
+    fn default() -> Self {
+        Self {
             max_line_length: 120,
             indent_width: 4,
             sort_derives: true,

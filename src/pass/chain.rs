@@ -42,8 +42,8 @@ pub(crate) fn reformat_chains(source: &str, config: &Config) -> String {
         if is_nested {
             let chain_start: usize = node.text_range().start().into();
             let chain_end: usize = node.text_range().end().into();
-            let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
-            let line_end = source[chain_end..].find('\n').map(|p| chain_end + p).unwrap_or(source.len());
+            let line_start = source[..chain_start].rfind('\n').map_or(0, |p| p + 1);
+            let line_end = source[chain_end..].find('\n').map_or(source.len(), |p| chain_end + p);
             if line_end - line_start <= config.max_line_length {
                 continue;
             }
@@ -58,13 +58,12 @@ pub(crate) fn reformat_chains(source: &str, config: &Config) -> String {
         let flat_text = flatten_chain_text(chain_text, &break_points, chain_start);
         let can_collapse = !flat_text.contains('\n');
         if can_collapse {
-            let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let line_start = source[..chain_start].rfind('\n').map_or(0, |p| p + 1);
             let prefix_len = chain_start - line_start;
             let after_chain = &source[chain_end..];
             let suffix_len = after_chain
                 .find('\n')
-                .map(|p| after_chain[..p].trim_end().len())
-                .unwrap_or_else(|| after_chain.trim_end().len());
+                .map_or_else(|| after_chain.trim_end().len(), |p| after_chain[..p].trim_end().len());
             let total_flat_len = prefix_len + flat_text.len() + suffix_len;
             if total_flat_len <= config.max_line_length {
                 for bp in &break_points {
@@ -83,7 +82,7 @@ pub(crate) fn reformat_chains(source: &str, config: &Config) -> String {
                     .position(|bp| bp.has_newline)
                     .expect("has_existing_breaks is true");
                 let first_break_bp = &break_points[first_break_idx];
-                let line_start = source[..chain_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+                let line_start = source[..chain_start].rfind('\n').map_or(0, |p| p + 1);
                 let first_line_len = first_break_bp.ws_start - line_start;
                 if first_line_len > config.max_line_length {
                     for bp in &break_points[..first_break_idx] {
@@ -121,12 +120,10 @@ pub(crate) fn reformat_chains(source: &str, config: &Config) -> String {
                     // No existing break — add one if the line is too long
                     let line_start = source[..bp.dot_offset]
                         .rfind('\n')
-                        .map(|p| p + 1)
-                        .unwrap_or(0);
+                        .map_or(0, |p| p + 1);
                     let line_end = source[bp.dot_offset..]
                         .find('\n')
-                        .map(|p| bp.dot_offset + p)
-                        .unwrap_or(source.len());
+                        .map_or(source.len(), |p| bp.dot_offset + p);
                     let line_len = line_end - line_start;
                     if line_len > config.max_line_length {
                         replacements.push((bp.ws_start, bp.dot_offset, format!("\n{indent}")));
@@ -237,6 +234,5 @@ fn compute_chain_indent(root: &SyntaxNode) -> usize {
     root.children_with_tokens()
         .find(|c| c.kind() == DOT)
         .and_then(|dot| dot.into_token())
-        .map(|t| compute_indent_level(&t))
-        .unwrap_or(0)
+        .map_or(0, |t| compute_indent_level(&t))
 }

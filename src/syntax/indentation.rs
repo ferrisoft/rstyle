@@ -67,8 +67,7 @@ pub(crate) fn is_macro_repetition(node: &SyntaxNode) -> bool {
         Some(p) if p.kind() == DOLLAR => true,
         Some(p) if p.kind() == WHITESPACE => p
             .prev_sibling_or_token()
-            .map(|pp| pp.kind() == DOLLAR)
-            .unwrap_or(false),
+            .is_some_and(|pp| pp.kind() == DOLLAR),
         _ => false,
     }
 }
@@ -77,8 +76,7 @@ fn is_macro_repetition_delimiter(token: &SyntaxToken) -> bool {
     matches!(token.kind(), R_PAREN | L_PAREN)
         && token
             .parent()
-            .map(|p| p.kind() == TOKEN_TREE && is_macro_repetition(&p))
-            .unwrap_or(false)
+            .is_some_and(|p| p.kind() == TOKEN_TREE && is_macro_repetition(&p))
 }
 
 
@@ -113,7 +111,7 @@ fn has_continuation_dot(node: &SyntaxNode) -> bool {
         && let Some(prev) = dot.prev_sibling_or_token()
         && prev.kind() == WHITESPACE
     {
-        return prev.as_token().map(|t| t.text().contains('\n')).unwrap_or(false);
+        return prev.as_token().is_some_and(|t| t.text().contains('\n'));
     }
     false
 }
@@ -133,8 +131,7 @@ fn count_continuation_ancestors(token: &SyntaxToken) -> usize {
             let came_from_receiver = node
                 .children()
                 .next()
-                .map(|fc| fc == prev_node)
-                .unwrap_or(false);
+                .is_some_and(|fc| fc == prev_node);
             if !came_from_receiver && has_continuation_dot(&node) {
                 count += 1;
             }

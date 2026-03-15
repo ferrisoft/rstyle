@@ -36,7 +36,7 @@ pub(crate) fn format_section_headers(source: &str) -> String {
             let border = format!("{indent}// {}", "=".repeat(border_eq_count));
             let middle = format!("{indent}{middle_trimmed}");
             while !result.is_empty()
-                && result.last().map(|l| l.trim().is_empty()).unwrap_or(false)
+                && result.last().is_some_and(|l| l.trim().is_empty())
             {
                 result.pop();
             }

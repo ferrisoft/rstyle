@@ -44,8 +44,8 @@ pub(crate) fn expand_long_inline_blocks(source: &str, config: &Config) -> String
         if text.contains('\n') {
             continue;
         }
-        let line_start = source[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let line_end = source[end..].find('\n').map(|p| end + p).unwrap_or(source.len());
+        let line_start = source[..start].rfind('\n').map_or(0, |p| p + 1);
+        let line_end = source[end..].find('\n').map_or(source.len(), |p| end + p);
         if line_end - line_start <= config.max_line_length {
             continue;
         }
@@ -105,18 +105,18 @@ pub(crate) fn collapse_opening_braces(source: &str, config: &Config) -> String {
         if !result.is_empty() {
             let prev_trimmed = result.last().map(|l| l.trim().to_string()).unwrap_or_default();
             if trimmed == "{" && !prev_trimmed.is_empty() && !prev_trimmed.ends_with('{') {
-                result.last_mut().unwrap().push_str(" {");
+                result.last_mut().expect("result is non-empty").push_str(" {");
                 continue;
             }
             if trimmed.starts_with("where") && !prev_trimmed.is_empty() {
-                let prev = result.last().unwrap();
+                let prev = result.last().expect("result is non-empty");
                 let merged_len = prev.len() + 1 + trimmed.len();
                 if merged_len <= config.max_line_length {
-                    result.last_mut().unwrap().push_str(&format!(" {trimmed}"));
+                    result.last_mut().expect("result is non-empty").push_str(&format!(" {trimmed}"));
                 } else {
                     let indent = leading_whitespace(line);
-                    let after_where = trimmed.strip_prefix("where").unwrap().trim_start();
-                    result.last_mut().unwrap().push_str(" where");
+                    let after_where = trimmed.strip_prefix("where").expect("starts with where").trim_start();
+                    result.last_mut().expect("result is non-empty").push_str(" where");
                     if !after_where.is_empty() {
                         result.push(format!("{indent}{after_where}"));
                     }
