@@ -89,6 +89,7 @@ fixture_tests! {
     // Strings
     reindent_multiline_string,
     reindent_multiline_string_preserves_relative_indent,
+    string_indent_in_chain,
 
     // Line breaks
     preserves_line_breaks,
@@ -116,6 +117,7 @@ fixture_tests! {
     macro_shift_operators,
     macro_arrows,
     macro_ref_angle_no_spaces,
+    macro_call_string_indent,
 
     // Structs & impls
     struct_literal,

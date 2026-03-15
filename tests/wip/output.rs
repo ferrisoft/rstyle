@@ -92,26 +92,26 @@ impl Default for View {
     fn default() -> Self {
         Self {
             xy: v2!(
-                ProjectionRange {
-                    range: Range {
-                        start: Dec!(0),
-                        end: Dec!(0)
-                    },
-                    projection: Projection {
-                        origin: Dec!(0),
-                        scale: Dec!(1_000_000)
-                    }
+            ProjectionRange {
+                range: Range {
+                    start: Dec!(0),
+                    end: Dec!(0)
                 },
-                ProjectionRange {
-                    range: Range {
-                        start: Dec!(0),
-                        end: Dec!(0)
-                    },
-                    projection: Projection {
-                        origin: Dec!(0),
-                        scale: Dec!(1_000)
-                    }
+                projection: Projection {
+                    origin: Dec!(0),
+                    scale: Dec!(1_000_000)
                 }
+            },
+            ProjectionRange {
+                range: Range {
+                    start: Dec!(0),
+                    end: Dec!(0)
+                },
+                projection: Projection {
+                    origin: Dec!(0),
+                    scale: Dec!(1_000)
+                }
+            }
             )
         }
     }
@@ -938,11 +938,11 @@ impl Component for TrafficLight {
     fn render(&self) -> impl IntoElement {
         Div::new()
             .style("
-            width: 14px;
-            height: 14px;
-            border-radius: 14px;
-            background-color: rgba(255, 255, 255, 0.1);
-        ")
+                width: 14px;
+                height: 14px;
+                border-radius: 14px;
+                background-color: rgba(255, 255, 255, 0.1);
+            ")
     }
 }
 
@@ -958,12 +958,12 @@ impl Component for TrafficLights {
     fn render(&self) -> impl IntoElement {
         Div::new()
             .style("
-            app-region: no-drag;
-            display: flex;
-            gap: 9px;
-            padding: 17px;
-            flex-shrink: 0;
-        ").children(elements![
+                app-region: no-drag;
+                display: flex;
+                gap: 9px;
+                padding: 17px;
+                flex-shrink: 0;
+            ").children(elements![
             TrafficLight,
             TrafficLight,
             TrafficLight,
@@ -977,48 +977,48 @@ impl Component for TrafficLights {
 // ==============
 
 css!("
-        body {
-            background-color: rgb(52 52 52 / 50%);
-        }
-    ");
+    body {
+        background-color: rgb(52 52 52 / 50%);
+    }
+");
 
 css!("
-        :root {
-            --accent-color: rgba(236, 103, 19, 1);
-            --button-height: 32px;
-            --selected-opacity: 0.8;
-            --not-selected-opacity: 0.3;
-            --hint-opacity: 0.3;
+    :root {
+        --accent-color: rgba(236, 103, 19, 1);
+        --button-height: 32px;
+        --selected-opacity: 0.8;
+        --not-selected-opacity: 0.3;
+        --hint-opacity: 0.3;
+    }
+
+    .button {
+        background-color: rgba(255,255,255,0.0);
+        opacity: 1;
+        transition: all 0.3s ease-in-out;
+        border-radius: 100px;
+        height: var(--button-height);
+
+        &.hovered {
+            // background-color: rgba(255,255,255,0.2);
         }
 
-        .button {
-            background-color: rgba(255,255,255,0.0);
+        &.selected {
+            // background-color: rgba(255,255,255,0.2);
+        }
+
+        &.not-selected {
+            opacity: var(--not-selected-opacity);
+        }
+
+        &.not-selected.hovered {
             opacity: 1;
-            transition: all 0.3s ease-in-out;
-            border-radius: 100px;
-            height: var(--button-height);
-
-            &.hovered {
-                // background-color: rgba(255,255,255,0.2);
-            }
-
-            &.selected {
-                // background-color: rgba(255,255,255,0.2);
-            }
-
-            &.not-selected {
-                opacity: var(--not-selected-opacity);
-            }
-
-            &.not-selected.hovered {
-                opacity: 1;
-            }
-
-            &.pressed {
-                // background-color: rgba(255,255,255,0.2);
-            }
         }
-    ");
+
+        &.pressed {
+            // background-color: rgba(255,255,255,0.2);
+        }
+    }
+");
 
 #[derive(Clone, Debug, Default)]
 pub struct Button {
@@ -1077,12 +1077,12 @@ impl DomRenderer for Button {
                 on_click.run(());
             })
             .style("
-            display: flex;
-            align-items: center;
+                display: flex;
+                align-items: center;
 
-            height: var(--child-height);
-            width: var(--child-width);
-        ").children(elements![
+                height: var(--child-height);
+                width: var(--child-width);
+            ").children(elements![
             Div::new()
                 .class(Signal::derive(move || {
                         let mut cls = "button".to_string();
@@ -1158,18 +1158,18 @@ impl DomRenderer for Group<Button> {
 // =======================
 
 css!("
-        .smooth-shadow {
-            box-shadow: 0px 0px 1px rgba(3, 7, 18, 0.02),
-                0px 0px 4px rgba(3, 7, 18, 0.03),
-                0px 0px 9px rgba(3, 7, 18, 0.05),
-                0px 0px 15px rgba(3, 7, 18, 0.06),
-                0px 0px 24px rgba(3, 7, 18, 0.08);
-        }
-    ");
+    .smooth-shadow {
+        box-shadow: 0px 0px 1px rgba(3, 7, 18, 0.02),
+            0px 0px 4px rgba(3, 7, 18, 0.03),
+            0px 0px 9px rgba(3, 7, 18, 0.05),
+            0px 0px 15px rgba(3, 7, 18, 0.06),
+            0px 0px 24px rgba(3, 7, 18, 0.08);
+    }
+");
 
 css!("
-        input::placeholder { color: var(--color-placeholder); }
-    ");
+    input::placeholder { color: var(--color-placeholder); }
+");
 
 
 pub trait FuzzyMatch {
@@ -1290,21 +1290,21 @@ impl FuzzyMatch for Tool {
 }
 
 css!("
-        .searchable-text {
-            & .matched {
-                color: var(--accent-color);
-            }
+    .searchable-text {
+        & .matched {
+            color: var(--accent-color);
         }
-    ");
+    }
+");
 
 impl Component for Entry<&Tool> {
     fn render(&self) -> impl IntoElement {
         Div::new()
             .style("
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        ")
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            ")
             .children(
             elements![
                 Div::new().inner_html(self.icon),
@@ -1436,25 +1436,25 @@ impl Component for SettingValue {
         let suffix = matches!(self, Self::Px(_)).then(|| "px");
         Div::new()
             .style("
-            height: 100%;
-            display: flex;
-            align-items: center;
-            gap: 2px;
-        ")
+                height: 100%;
+                display: flex;
+                align-items: center;
+                gap: 2px;
+            ")
             .children(elements![
                 Input::new()
                     .class("allow-focus")
                     .style("
-                    height: 100%;
-                    width: 60px;
-                    background: transparent;
-                    border: none;
-                    outline: none;
-                    font: inherit;
-                    padding-left: 6px;
-                    padding-right: 6px;
-                    text-align: right
-                ")
+                        height: 100%;
+                        width: 60px;
+                        background: transparent;
+                        border: none;
+                        outline: none;
+                        font: inherit;
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        text-align: right
+                    ")
                     .value(value.as_str()),
                 suffix
             ])
@@ -1468,30 +1468,30 @@ impl FuzzyMatch for Setting {
 }
 
 css!("
-        input:focus {
-            box-shadow: 0px 0px 0px 1px var(--accent-color);
-            border-radius: 4px;
-        }
-    ");
+    input:focus {
+        box-shadow: 0px 0px 0px 1px var(--accent-color);
+        border-radius: 4px;
+    }
+");
 
 impl Component for Entry<&Setting> {
     fn render(&self) -> impl IntoElement {
         Div::new()
             .style("
-            height: 100%;
-            display: flex;
-            width: 100%;
-            justify-content: space-between;
-        ")
+                height: 100%;
+                display: flex;
+                width: 100%;
+                justify-content: space-between;
+            ")
             .children(
             elements![
                 Div::new()
                     .style("
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                ")
+                        height: 100%;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    ")
                     .children(
                     elements![
                         Div::new().inner_html(self.icon),
@@ -1603,26 +1603,26 @@ fn init_global_database() -> Rc<RefCell<GlobalDatabase>> {
 //             opacity: var(--selected-opacity);
 //         }
 css!("
-        .universal-search {
-            & .row {
-                opacity: 0.8;
-            }
-            & .row.hovered {
-                opacity: 1;
-                background-color: rgba(255, 255, 255, 0.5);
-            }
-            & .row.selected {
-                opacity: 1;
-                background-color: rgba(255, 255, 255, 1.0);
-            }
+    .universal-search {
+        & .row {
+            opacity: 0.8;
         }
+        & .row.hovered {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        & .row.selected {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 1.0);
+        }
+    }
 
-        .breadcrumbs {
-            & .not-selected {
-                opacity: 0.3;
-            }
+    .breadcrumbs {
+        & .not-selected {
+            opacity: 0.3;
         }
-    ");
+    }
+");
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UniversalSearch;
@@ -1819,12 +1819,12 @@ impl DomRenderer for UniversalSearch {
                             cls
                         }))
                         .style("
-                        display: flex;
-                        height: calc(1px * var(--theme-row-height));
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        border-radius: 14px;
-                    ")
+                            display: flex;
+                            height: calc(1px * var(--theme-row-height));
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            border-radius: 14px;
+                        ")
                         .children(elements![entry.render()])
                         .on::<web::MouseEnter>(move |_| hovered_index.set(Some(ix)))
                         .on::<web::MouseLeave>(move |_| hovered_index.set(None))
@@ -1848,11 +1848,11 @@ impl DomRenderer for UniversalSearch {
                 let rows_container = Div::new()
                     .class("rows-container")
                     .style("
-                    width: 100%;
-                    display: flex;
-                    flex-direction: column-reverse;
-                    padding: calc(1px * var(--theme-panel-padding));
-                ")
+                        width: 100%;
+                        display: flex;
+                        flex-direction: column-reverse;
+                        padding: calc(1px * var(--theme-panel-padding));
+                    ")
                     .children(rows);
 
                 render(&rows_container)
@@ -1884,11 +1884,11 @@ impl DomRenderer for UniversalSearch {
                         if ix <= breadcrumbs_hover_ix.get().unwrap_or(1000) { "" } else { "not-selected" }
                     }))
                     .style("
-                    display: flex;
-                    align-items: center;
-                    transition: all 0.3s ease-in-out;
-                    cursor: pointer;
-                ")
+                        display: flex;
+                        align-items: center;
+                        transition: all 0.3s ease-in-out;
+                        cursor: pointer;
+                    ")
                     .children(elements![path])
                     .on::<web::MouseEnter>(move |_| breadcrumbs_hover_ix.set(Some(ix)))
                     .on::<web::MouseLeave>(move |_| breadcrumbs_hover_ix.set(None))
@@ -1898,10 +1898,10 @@ impl DomRenderer for UniversalSearch {
             let container = Div::new()
                 .class("breadcrumbs")
                 .style("
-                height: 100%;
-                display: flex;
-                white-space: pre-wrap;
-            ")
+                    height: 100%;
+                    display: flex;
+                    white-space: pre-wrap;
+                ")
                 .children(items);
             let rendered = render(&container);
             if let Some(nr) = input_overlay_ref.get() {
@@ -1916,87 +1916,87 @@ impl DomRenderer for UniversalSearch {
         let search_input = Div::new()
             .class("panel")
             .style("
-            position: relative;
-            display: flex;
-            width: 800px;
-        ")
+                position: relative;
+                display: flex;
+                width: 800px;
+            ")
             .children(elements![
                 PanelBackground::default(),
                 Div::new()
                     .class("content")
                     .style("
-                    position: relative;
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    flex-direction: column;
-                ")
+                        position: relative;
+                        width: 100%;
+                        height: 100%;
+                        display: flex;
+                        flex-direction: column;
+                    ")
                     .children(elements![
                         Div::new()
                             .class("search-bar")
                             .style("
-                            position: relative;
-                            width: 100%;
-                            height: 40px;
-                            display: flex;
-                        ")
+                                position: relative;
+                                width: 100%;
+                                height: 40px;
+                                display: flex;
+                            ")
                             .children(elements![
                                 Div::new()
                                     .style("
-                                    display: flex;
-                                    height: 100%;
-                                ")
+                                        display: flex;
+                                        height: 100%;
+                                    ")
                                     .children(elements![
                                         Div::new()
                                             .style("
-                                            display: flex;
-                                            align-items: center;
-                                            padding-left: 9px;
-                                        ")
+                                                display: flex;
+                                                align-items: center;
+                                                padding-left: 9px;
+                                            ")
                                             .inner_html(ferris_trader_icons::DROPDOWN_ARROW),
                                         Div::new()
                                             .style("
-                                            display: flex;
-                                            align-items: center;
-                                            padding-left: 3px;
-                                        ")
+                                                display: flex;
+                                                align-items: center;
+                                                padding-left: 3px;
+                                            ")
                                             .inner_html(ferris_trader_icons::SEARCH),
                                     ]),
                                 Div::new()
                                     .class("search-box")
                                     .style("
-                                    position: relative;
-                                    height: 100%;
-                                    display: flex;
-                                    flex-grow: 1;
-                                ")
+                                        position: relative;
+                                        height: 100%;
+                                        display: flex;
+                                        flex-grow: 1;
+                                    ")
                                     .children(elements![
                                         Div::new()
                                             .node_ref(&input_overlay_ref)
                                             .class("search-input-overlay")
                                             .style("
-                                            position: absolute;
-                                            left: 0;
-                                            top: 0;
-                                            height: 100%;
-                                            padding-left: 8px;
-                                            display: flex;
-                                            align-items: center;
-                                        "),
+                                                position: absolute;
+                                                left: 0;
+                                                top: 0;
+                                                height: 100%;
+                                                padding-left: 8px;
+                                                display: flex;
+                                                align-items: center;
+                                            "),
                                         Input::new()
                                             .node_ref(&input_ref)
                                             .class("search-input allow-focus")
                                             .style("
-                                            flex-grow: 1;
-                                            background: transparent;
-                                            border: none;
-                                            outline: none;
-                                            box-shadow: none;
-                                            font: inherit;
-                                            padding-left: 8px;
-                                            color: transparent;
-                                            caret-color: var(--theme-text-color);
-                                        ")
+                                                flex-grow: 1;
+                                                background: transparent;
+                                                border: none;
+                                                outline: none;
+                                                box-shadow: none;
+                                                font: inherit;
+                                                padding-left: 8px;
+                                                color: transparent;
+                                                caret-color: var(--theme-text-color);
+                                            ")
                                             .placeholder("Type to search ...")
                                             .on::<web::KeyDown>(move | event | {
                                                 log!("keydown: {}", event.key());
@@ -2055,12 +2055,12 @@ impl DomRenderer for UniversalSearch {
         let search_results = Div::new()
             .class("panel")
             .style("
-            position: relative;
-            display: flex;
-            width: 800px;
-            border-radius: 20px;
-            overflow: hidden;
-        ")
+                position: relative;
+                display: flex;
+                width: 800px;
+                border-radius: 20px;
+                overflow: hidden;
+            ")
             .children(elements![
                 PanelBackground::default(),
                 Div::new()
@@ -2109,9 +2109,9 @@ impl DomRenderer for UniversalSearch {
                             .node_ref(&rows_ref)
                             .class("rows")
                             .style("
-                            width: 100%;
-                            display: flex;
-                        ")
+                                width: 100%;
+                                display: flex;
+                            ")
                     ])
             ]);
 
@@ -2119,12 +2119,12 @@ impl DomRenderer for UniversalSearch {
         let div = Div::new()
             .class("universal-search")
             .style("
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.4);
-            z-index: 1000;
-        ").children(elements![
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.4);
+                z-index: 1000;
+            ").children(elements![
             Div::new()
                 .class("content")
                 .style("
@@ -2183,14 +2183,14 @@ impl DomRenderer for PanelBackground {
         let div = Div::new()
             .class("panel-background")
             .style("
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            border-radius: 20px;
-        ")
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                border-radius: 20px;
+            ")
             .children(elements![
                 Div::new()
                     .style(format!("
@@ -2239,51 +2239,51 @@ impl DomRenderer for DomApp {
         Div::new()
             .class("app")
             .style("
-            opacity: 1.0;
-            position: relative;
-            display: flex;
-            width: 100vw;
-            height: 100vh;
-            font-family: \"SF Pro Text\";
-            font-size: 12px;
-            color: var(--theme-text-color);
-            --color-placeholder: var(--theme-text-placeholder-color);
-        ")
+                opacity: 1.0;
+                position: relative;
+                display: flex;
+                width: 100vw;
+                height: 100vh;
+                font-family: \"SF Pro Text\";
+                font-size: 12px;
+                color: var(--theme-text-color);
+                --color-placeholder: var(--theme-text-placeholder-color);
+            ")
             .children(elements![
                 BackgroundNoiseFilter,
                 UniversalSearch,
                 Div::new()
                     .class("content")
                     .style("
-                    position: relative;
-                    flex-grow: 1;
-                    display: flex;
-                    flex-direction: column;
-                ")
+                        position: relative;
+                        flex-grow: 1;
+                        display: flex;
+                        flex-direction: column;
+                    ")
                     .children(elements![
                         Div::new()
                             .class("menu-bar")
                             .style("
-                            app-region: no-drag;
-                            position: relative;
-                            display: flex;
-                            width: 100%;
-                            height: 48px;
-                            background-color: black;
-                            flex-shrink: 0;
-                            cursor: default;
-                        ").children(elements![
+                                app-region: no-drag;
+                                position: relative;
+                                display: flex;
+                                width: 100%;
+                                height: 48px;
+                                background-color: black;
+                                flex-shrink: 0;
+                                cursor: default;
+                            ").children(elements![
                                 TrafficLights,
                                 Group::default()
                                     .style("
-                                    display: flex;
-                                    flex-grow: 1;
-                                    align-items: center;
-                                    --child-padding-horizontal: 2px;
-                                    --child-padding-vertical: 0px;
-                                    --child-height: 100%;
-                                    --child-width: auto;
-                                ")
+                                        display: flex;
+                                        flex-grow: 1;
+                                        align-items: center;
+                                        --child-padding-horizontal: 2px;
+                                        --child-padding-vertical: 0px;
+                                        --child-height: 100%;
+                                        --child-width: auto;
+                                    ")
                                     .children(vec![
                                         Button::default()
                                             .children(elements![
@@ -2300,10 +2300,10 @@ impl DomRenderer for DomApp {
                         Div::new()
                             .class("body")
                             .style("
-                            position: relative;
-                            width: 100%;
-                            flex-grow: 1;
-                        ")
+                                position: relative;
+                                width: 100%;
+                                flex-grow: 1;
+                            ")
                             .children(elements![
                                 Div::new().id("layout-root"),
                                 Div::new().id("gl-root")
@@ -2331,7 +2331,7 @@ pub mod universal_search {
 #[wasm_bindgen(start)]
 pub async fn main() {
     log!("::: {}", serde_json::to_string(&universal_search::Event::Open)
-            .expect("Failed to serialize universal_search::Event."));
+        .expect("Failed to serialize universal_search::Event."));
 
     mount_registered_global_css().expect("Failed to mount global CSS styles.");
     any_spawner::Executor::init_wasm_bindgen().warn();

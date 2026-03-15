@@ -965,7 +965,10 @@ fn reindent_string_token(output: &mut String, token: &SyntaxToken) {
         output.push_str(text);
         return;
     }
-    let indent_level = compute_indent_level(token);
+    let last_newline = output.rfind('\n').map(|p| p + 1).unwrap_or(0);
+    let current_line = &output[last_newline..];
+    let visual_indent = current_line.len() - current_line.trim_start().len();
+    let indent_level = visual_indent / 4;
     let content_indent: String = "    ".repeat(indent_level + 1);
     let closing_indent: String = "    ".repeat(indent_level);
     let last_idx = lines.len() - 1;
@@ -1053,6 +1056,11 @@ fn is_indent_node(node: &SyntaxNode, token: &SyntaxToken) -> bool {
     }
     if kind == TOKEN_TREE {
         if is_macro_repetition(node) {
+            return false;
+        }
+        if node.first_child_or_token().map(|f| f.kind()) == Some(L_PAREN)
+            && node.parent().map(|p| p.kind()) == Some(MACRO_CALL)
+        {
             return false;
         }
         return !is_delimiter_of(node, token);
