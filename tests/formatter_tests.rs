@@ -18,7 +18,7 @@ fn run_fixture(name: &str) {
     } else {
         input.clone()
     };
-    let actual = rust_formatter::formatter::format_source(&input);
+    let actual = rstyle::formatter::format_source(&input);
     if actual != expected {
         panic!(
             "Fixture '{name}' failed.\n\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n--- end ---"

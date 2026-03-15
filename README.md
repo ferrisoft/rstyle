@@ -1,8 +1,8 @@
-# rust_formatter
+# rstyle
 
 An opinionated Rust code formatter that **respects your line breaks**.
 
-Unlike `rustfmt`, which rewraps and reflowing nearly everything, `rust_formatter` preserves your intentional line breaks and only normalizes horizontal spacing, indentation, and constructs that exceed the configured line length. It uses `ra_ap_syntax` (rust-analyzer's lossless CST parser) to understand code structure without altering semantics.
+Unlike `rustfmt`, which rewraps and reflowing nearly everything, `rstyle` preserves your intentional line breaks and only normalizes horizontal spacing, indentation, and constructs that exceed the configured line length. It uses `ra_ap_syntax` (rust-analyzer's lossless CST parser) to understand code structure without altering semantics.
 
 Key differences from `rustfmt`:
 - **Preserves line breaks** -- your vertical layout choices are kept.
@@ -20,8 +20,8 @@ cargo install --path .
 Or, to build from source:
 
 ```sh
-git clone https://github.com/user/rust_formatter.git
-cd rust_formatter
+git clone https://github.com/user/rstyle.git
+cd rstyle
 cargo build --release
 ```
 
@@ -30,32 +30,32 @@ cargo build --release
 **Format from stdin:**
 
 ```sh
-cat src/main.rs | rust_formatter
+cat src/main.rs | rstyle
 ```
 
 **Format a file, printing to stdout:**
 
 ```sh
-rust_formatter src/main.rs
+rstyle src/main.rs
 ```
 
 **Format a file in-place:**
 
 ```sh
-rust_formatter --write src/main.rs
+rstyle --write src/main.rs
 ```
 
 **Check if files are already formatted (CI mode):**
 
 ```sh
-rust_formatter --check src/*.rs
+rstyle --check src/*.rs
 # Exits with code 1 if any file is not formatted.
 ```
 
 **Format multiple files in-place:**
 
 ```sh
-rust_formatter --write src/**/*.rs
+rstyle --write src/**/*.rs
 ```
 
 ## Configuration

@@ -1,4 +1,4 @@
-# rust_formatter
+# rstyle
 
 A Rust code formatter that respects user intent. It normalizes horizontal spacing,
 indentation, and trailing whitespace. It also reformats method chains that exceed

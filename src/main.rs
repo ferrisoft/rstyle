@@ -13,7 +13,7 @@ use std::process;
 // ===========
 
 #[derive(Parser)]
-#[command(name = "rust-formatter")]
+#[command(name = "rstyle")]
 #[command(about = "A Rust code formatter that respects your line breaks")]
 struct Cli {
     /// Files to format. If empty, reads from stdin.
@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     if cli.files.is_empty() {
         let mut source = String::new();
         io::stdin().read_to_string(&mut source)?;
-        let formatted = rust_formatter::formatter::format_source(&source);
+        let formatted = rstyle::formatter::format_source(&source);
         if cli.check {
             if source != formatted {
                 process::exit(1);
@@ -49,7 +49,7 @@ fn main() -> Result<()> {
         for path in &cli.files {
             let source = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read {}", path.display()))?;
-            let formatted = rust_formatter::formatter::format_source(&source);
+            let formatted = rstyle::formatter::format_source(&source);
             if cli.check {
                 if source != formatted {
                     eprintln!("{}: not formatted", path.display());
